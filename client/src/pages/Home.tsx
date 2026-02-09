@@ -286,6 +286,17 @@ export default function Home() {
       .join(", ");
 
     try {
+      console.log('[DEBUG] Saving artist with data:', {
+        name: artistForm.name,
+        genre: artistForm.genres.join(","),
+        phone: artistForm.phone,
+        instagram: artistForm.instagram,
+        grade: artistForm.grade,
+        availableTime: artistForm.availableTime,
+        instruments: instrumentsString,
+        notes: artistForm.notes,
+      });
+
       if (editingArtist) {
         await updateArtist.mutateAsync({
           id: editingArtist.id,
@@ -314,8 +325,11 @@ export default function Home() {
       }
       setIsArtistOpen(false);
       refetchArtists();
-    } catch (e) {
-      toast.error("저장 실패");
+    } catch (e: any) {
+      console.error('[DEBUG] Save failed:', e);
+      console.error('[DEBUG] Error message:', e?.message);
+      console.error('[DEBUG] Error details:', JSON.stringify(e, null, 2));
+      toast.error(`저장 실패: ${e?.message || '알 수 없는 오류'}`);
     }
   };
 
