@@ -60,8 +60,8 @@ function SearchResults({ query, onSelect }: { query: string; onSelect: (artist: 
 
 export default function Home() {
   useEffect(() => {
-    console.log("[V2.1] App Initialized");
-    console.log("[V2.1] Environment:", import.meta.env.MODE);
+    console.log("[V2.2] App Initialized");
+    console.log("[V2.2] Environment:", import.meta.env.MODE);
   }, []);
 
   const [isAdmin, setIsAdmin] = useState(() => {
@@ -295,7 +295,7 @@ export default function Home() {
       .join(", ");
 
     try {
-      console.log('[DEBUG] Saving artist with data:', {
+      const inputData = {
         name: artistForm.name,
         genre: artistForm.genres.join(","),
         phone: artistForm.phone,
@@ -304,7 +304,8 @@ export default function Home() {
         availableTime: artistForm.availableTime,
         instruments: instrumentsString,
         notes: artistForm.notes,
-      });
+      };
+      console.log('[V2.2] Saving artist with data:', inputData);
 
       if (editingArtist) {
         await updateArtist.mutateAsync({
@@ -446,7 +447,7 @@ export default function Home() {
               작은따옴표
             </h1>
             <div className="bg-red-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black animate-pulse">
-              V2.1 LIVE
+              V2.2 LIVE
             </div>
           </div>
 
@@ -919,7 +920,7 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      <footer className="py-8 bg-slate-50/50"><div className="container text-center text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">Jak-Eun-Tta-Om-Pyo. Mobile Ready v2.1</div></footer>
+      <footer className="py-8 bg-slate-50/50"><div className="container text-center text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">Jak-Eun-Tta-Om-Pyo. Mobile Ready v2.2</div></footer>
     </div >
   );
 }

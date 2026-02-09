@@ -106,27 +106,36 @@ export async function getUserByOpenId(openId: string, dbInstance?: any) {
  */
 export async function createArtist(data: any, dbInstance?: any) {
   const db = dbInstance || await getDb();
-  if (!db) throw new Error("데이터베이스 정보를 불러올 수 없습니다. 설정을 확인해 주세요.");
+  if (!db) throw new Error("데이터베이스 연결 실패");
 
   try {
-    // Explicitly select fields to insert and handle nulls for optional ones
-    const values = {
-      name: data.name,
-      genre: data.genre,
-      phone: data.phone ?? null,
-      instagram: data.instagram ?? null,
-      grade: data.grade ?? null,
-      availableTime: data.availableTime ?? null,
-      instruments: data.instruments ?? null,
-      notes: data.notes ?? null,
-    };
+    // We use raw SQL to be 100% sure about the column mapping 
+    // and to bypass any Drizzle identity column/returning issues in Cloudflare.
+    const name = data.name || "";
+    const genre = data.genre || "";
+    const phone = data.phone || null;
+    const instagram = data.instagram || null;
+    const grade = data.grade || null;
+    const available_time = data.availableTime || null;
+    const instruments = data.instruments || null;
+    const notes = data.notes || null;
 
-    const [newArtist] = await db.insert(artists).values(values).returning();
-    return newArtist;
+    console.log("[V2.2] Inserting artist with manual params");
+
+    const result = await db.execute(sql`
+      INSERT INTO artists (name, genre, phone, instagram, grade, available_time, instruments, notes)
+      VALUES (${name}, ${genre}, ${phone}, ${instagram}, ${grade}, ${available_time}, ${instruments}, ${notes})
+      RETURNING id, name, genre, phone, instagram, grade, available_time, instruments, notes, is_favorite, created_at, updated_at
+    `);
+
+    if (!result || result.length === 0) {
+      throw new Error("저장 후 데이터를 불러오지 못했습니다.");
+    }
+
+    return result[0];
   } catch (error: any) {
-    console.error("[Database] createArtist failed:", error);
-    // Return a detailed error message that the frontend can display
-    throw new Error(`저장 실패: ${error.message}${error.detail ? ` (${error.detail})` : ""}`);
+    console.error("[Database] createArtist V2.2 failed:", error);
+    throw new Error(`저장 실패 (V2.2): ${error.message}${error.detail ? ` (${error.detail})` : ""}`);
   }
 }
 
