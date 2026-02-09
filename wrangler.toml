@@ -1,5 +1,6 @@
 # Cloudflare Pages configuration
 name = "artist-performance-manager"
+pages_build_output_dir = "dist/public"
 
 # Enable Node.js compatibility for postgres package
 compatibility_flags = ["nodejs_compat"]
