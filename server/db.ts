@@ -104,12 +104,30 @@ export async function getUserByOpenId(openId: string, dbInstance?: any) {
 /**
  * Artist queries
  */
-export async function createArtist(data: InsertArtist, dbInstance?: any) {
+export async function createArtist(data: any, dbInstance?: any) {
   const db = dbInstance || await getDb();
   if (!db) throw new Error("데이터베이스 정보를 불러올 수 없습니다. 설정을 확인해 주세요.");
 
-  const [newArtist] = await db.insert(artists).values(data).returning();
-  return newArtist;
+  try {
+    // Explicitly select fields to insert and handle nulls for optional ones
+    const values = {
+      name: data.name,
+      genre: data.genre,
+      phone: data.phone ?? null,
+      instagram: data.instagram ?? null,
+      grade: data.grade ?? null,
+      availableTime: data.availableTime ?? null,
+      instruments: data.instruments ?? null,
+      notes: data.notes ?? null,
+    };
+
+    const [newArtist] = await db.insert(artists).values(values).returning();
+    return newArtist;
+  } catch (error: any) {
+    console.error("[Database] createArtist failed:", error);
+    // Return a detailed error message that the frontend can display
+    throw new Error(`저장 실패: ${error.message}${error.detail ? ` (${error.detail})` : ""}`);
+  }
 }
 
 export async function getArtists(search?: string, genre?: string, dbInstance?: any) {

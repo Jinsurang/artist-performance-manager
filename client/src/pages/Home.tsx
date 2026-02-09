@@ -39,7 +39,7 @@ function SearchResults({ query, onSelect }: { query: string; onSelect: (artist: 
 
   return (
     <>
-      {results.map((artist) => (
+      {results.map((artist: any) => (
         <div
           key={artist.id}
           onClick={() => onSelect(artist)}
@@ -364,8 +364,8 @@ export default function Home() {
             const isPast = date < today;
             const isToday = isSameDay(date, today);
 
-            const perfs = monthlyPerfs?.filter(p => isSameDay(new Date(p.performanceDate), date)) || [];
-            const hasConfirmed = perfs.some(p => p.status !== 'pending');
+            const perfs = monthlyPerfs?.filter((p: any) => isSameDay(new Date(p.performanceDate), date)) || [];
+            const hasConfirmed = perfs.some((p: any) => p.status !== 'pending');
             const isSelected = selectedDates.some(d => isSameDay(d, date));
 
             return (
@@ -911,8 +911,7 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      <footer className="py-8 bg-slate-50/50"><div className="container text-center text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">Jak-Eun-Tta-Om-Pyo. Mobile Ready v2.0</div></footer>
+      <footer className="py-8 bg-slate-50/50"><div className="container text-center text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">Jak-Eun-Tta-Om-Pyo. Mobile Ready v2.1</div></footer>
     </div >
   );
 }
-// dummy
