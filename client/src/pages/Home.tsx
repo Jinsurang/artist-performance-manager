@@ -140,6 +140,14 @@ export default function Home() {
   const createNotice = trpc.notice.create.useMutation();
   const { data: latestNotice } = trpc.notice.getLatest.useQuery();
   const adminLogin = trpc.auth.adminLogin.useMutation();
+  const getSetting = trpc.settings.get.useQuery({ key: "message_template" }, { enabled: isAdmin });
+  const updateSetting = trpc.settings.update.useMutation();
+
+  useEffect(() => {
+    if (getSetting.data) {
+      setMessageTemplate(getSetting.data);
+    }
+  }, [getSetting.data]);
 
   const handleAdminLogin = async () => {
     try {
@@ -850,9 +858,14 @@ export default function Home() {
             </div>
             <Button
               className="w-full h-12 rounded-2xl font-black text-sm"
-              onClick={() => {
-                toast.success('템플릿이 저장되었습니다.');
-                setIsTemplateOpen(false);
+              onClick={async () => {
+                try {
+                  await updateSetting.mutateAsync({ key: "message_template", value: messageTemplate });
+                  toast.success('템플릿이 저장되었습니다.');
+                  setIsTemplateOpen(false);
+                } catch (error) {
+                  toast.error('템플릿 저장 실패');
+                }
               }}
             >
               템플릿 저장

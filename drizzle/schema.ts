@@ -72,3 +72,16 @@ export const notices = pgTable("notices", {
 
 export type Notice = typeof notices.$inferSelect;
 export type InsertNotice = typeof notices.$inferInsert;
+
+/**
+ * Settings table - 앱 전역 설정 (메시지 템플릿 등)
+ */
+export const settings = pgTable("settings", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  key: varchar("key", { length: 255 }).notNull().unique(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type Setting = typeof settings.$inferSelect;
+export type InsertSetting = typeof settings.$inferInsert;

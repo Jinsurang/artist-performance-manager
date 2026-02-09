@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { InsertUser, users, artists, performances, notices, InsertArtist, InsertPerformance, InsertNotice } from "../drizzle/schema";
+import { InsertUser, users, artists, performances, notices, InsertArtist, InsertPerformance, InsertNotice, settings } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 // Safe access to process.env (may not exist in Cloudflare Workers)
@@ -113,7 +113,7 @@ export async function getUserByOpenId(openId: string, dbInstance?: any) {
 /**
  * Artist queries
  */
-export async function createArtist(data: any) {
+export async function createArtist(data: any, dbInstance?: any) {
   const sqlClient = await getRawSql();
   if (!sqlClient) throw new Error("데이터베이스 연결 실패");
 
@@ -280,4 +280,27 @@ export async function getNotices(dbInstance?: any) {
   const db = dbInstance || await getDb();
   if (!db) return [];
   return await db.select().from(notices).orderBy(sql`notices.created_at DESC`);
+}
+
+/**
+ * Settings queries
+ */
+export async function getSetting(key: string, dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(settings).where(eq(settings.key, key)).limit(1);
+  return result.length > 0 ? result[0].value : undefined;
+}
+
+export async function updateSetting(key: string, value: string, dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Upsert pattern
+  return await db.insert(settings)
+    .values({ key, value })
+    .onConflictDoUpdate({
+      target: settings.key,
+      set: { value, updatedAt: new Date() }
+    });
 }

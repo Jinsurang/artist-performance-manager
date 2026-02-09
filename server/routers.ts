@@ -22,6 +22,8 @@ import {
   getNotices,
   searchPublicArtists,
   upsertUser,
+  getSetting,
+  updateSetting,
 } from "./db";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
@@ -235,6 +237,19 @@ export const appRouter = router({
       .query(async ({ ctx }) => {
         const notices = await getNotices(ctx.db);
         return notices[0] || null;
+      }),
+  }),
+
+  settings: router({
+    get: protectedProcedure
+      .input(z.object({ key: z.string() }))
+      .query(async ({ input, ctx }) => {
+        return await getSetting(input.key, ctx.db);
+      }),
+    update: protectedProcedure
+      .input(z.object({ key: z.string(), value: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        return await updateSetting(input.key, input.value, ctx.db);
       }),
   }),
 });
