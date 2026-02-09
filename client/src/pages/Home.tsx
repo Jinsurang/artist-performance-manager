@@ -60,7 +60,7 @@ function SearchResults({ query, onSelect }: { query: string; onSelect: (artist: 
 
 export default function Home() {
   useEffect(() => {
-    console.log("[V2.4] App Initialized - Optimization Active");
+    console.log("[V3.0] Migration to Render - Stable Environment");
   }, []);
 
   const [isAdmin, setIsAdmin] = useState(() => {
@@ -304,7 +304,7 @@ export default function Home() {
         instruments: instrumentsString,
         notes: artistForm.notes,
       };
-      console.log('[V2.4] Saving artist (Optimized):', inputData);
+      console.log('[V3.0] Saving artist (Render Ready):', inputData);
 
       if (editingArtist) {
         await updateArtist.mutateAsync({
@@ -445,8 +445,8 @@ export default function Home() {
             <h1 className="text-lg font-black tracking-tighter text-primary uppercase">
               작은따옴표
             </h1>
-            <div className="bg-emerald-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black animate-pulse">
-              V2.4 OPTIMIZED
+            <div className="bg-orange-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black animate-pulse">
+              V3.0 RENDER MIGRATION
             </div>
           </div>
 
@@ -919,7 +919,7 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      <footer className="py-8 bg-slate-50/50"><div className="container text-center text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">Jak-Eun-Tta-Om-Pyo. Mobile Ready v2.4</div></footer>
+      <footer className="py-8 bg-slate-50/50"><div className="container text-center text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">Jak-Eun-Tta-Om-Pyo. Mobile Ready v3.0</div></footer>
     </div >
   );
 }

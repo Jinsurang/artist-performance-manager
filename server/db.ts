@@ -21,8 +21,9 @@ export async function getDb(databaseUrl?: string) {
         ssl: 'require',
         max_prepared: 0,
         connect_timeout: 10,
-        // Cloudflare Workers work best with single connections per request
-        max: 1,
+        // Render (Node.js) can handle multiple connections better than Cloudflare
+        max: 10,
+        idle_timeout: 30,
       } as any);
       _db = drizzle(_sql);
     } catch (error) {
@@ -116,7 +117,7 @@ export async function createArtist(data: any) {
   const sqlClient = await getRawSql();
   if (!sqlClient) throw new Error("데이터베이스 연결 실패");
 
-  // V2.4: Optimized for Cloudflare Workers (Minimal subrequests)
+  // V3.0: Standard SQL insert for Node.js (Render)
   const result = await sqlClient`
     INSERT INTO artists (name, genre, phone, instagram, grade, available_time, instruments, notes)
     VALUES (
