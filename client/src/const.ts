@@ -7,11 +7,21 @@ export const getLoginUrl = () => {
   const redirectUri = `${window.location.origin}/api/oauth/callback`;
   const state = btoa(redirectUri);
 
-  const url = new URL(`${oauthPortalUrl}/app-auth`);
-  url.searchParams.set("appId", appId);
-  url.searchParams.set("redirectUri", redirectUri);
-  url.searchParams.set("state", state);
-  url.searchParams.set("type", "signIn");
+  if (!oauthPortalUrl || !appId) {
+    console.warn("[Auth] OAuth credentials missing. Redirect skipped.");
+    return "/?login_error=missing_credentials";
+  }
 
-  return url.toString();
+  try {
+    const url = new URL(`${oauthPortalUrl}/app-auth`);
+    url.searchParams.set("appId", appId);
+    url.searchParams.set("redirectUri", redirectUri);
+    url.searchParams.set("state", state);
+    url.searchParams.set("type", "signIn");
+
+    return url.toString();
+  } catch (e) {
+    console.error("[Auth] Failed to construct login URL:", e);
+    return "/?login_error=invalid_url";
+  }
 };

@@ -64,12 +64,37 @@ export default function Home() {
   }, []);
 
   const [isAdmin, setIsAdmin] = useState(() => {
-    // Restore login state from localStorage
-    const saved = localStorage.getItem('isAdmin');
-    return saved === 'true';
+    // Stage 1: Pessimistic check from localStorage
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('isAdmin') === 'true';
+    }
+    return false;
   });
   const [password, setPassword] = useState("");
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+
+  // Stage 2: Server-side verification
+  const { data: me, isLoading: isAuthLoading } = trpc.auth.me.useQuery(undefined, {
+    retry: false,
+    staleTime: 1000 * 60 * 5, // 5 mins
+  });
+
+  useEffect(() => {
+    if (me) {
+      if (me.role === 'admin') {
+        setIsAdmin(true);
+        localStorage.setItem('isAdmin', 'true');
+      } else {
+        setIsAdmin(false);
+        localStorage.removeItem('isAdmin');
+      }
+    } else if (!isAuthLoading && isAdmin) {
+      // If we thought we were admin but server says no (e.g. session expired)
+      setIsAdmin(false);
+      localStorage.removeItem('isAdmin');
+      console.warn("[Auth] Session expired or invalid. Re-auth required.");
+    }
+  }, [me, isAuthLoading]);
 
   const [tab, setTab] = useState("dashboard");
   const [isArtistOpen, setIsArtistOpen] = useState(false);
@@ -140,7 +165,10 @@ export default function Home() {
   const createNotice = trpc.notice.create.useMutation();
   const { data: latestNotice } = trpc.notice.getLatest.useQuery();
   const adminLogin = trpc.auth.adminLogin.useMutation();
-  const getSetting = trpc.settings.get.useQuery({ key: "message_template" }, { enabled: isAdmin });
+  const getSetting = trpc.settings.get.useQuery({ key: "message_template" }, {
+    enabled: isAdmin,
+    retry: false
+  });
   const updateSetting = trpc.settings.update.useMutation();
 
   useEffect(() => {
