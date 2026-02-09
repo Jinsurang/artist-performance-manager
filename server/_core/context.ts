@@ -1,28 +1,21 @@
-import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
-import { sdk } from "./sdk";
 
 export type TrpcContext = {
-  req: CreateExpressContextOptions["req"];
-  res: CreateExpressContextOptions["res"];
   user: User | null;
+  db?: any; // Drizzle instance
+  env?: any; // Cloudflare environment
+  req?: any; // Legacy Express request
+  res?: any; // Legacy Express response
 };
 
 export async function createContext(
-  opts: CreateExpressContextOptions
+  opts: any
 ): Promise<TrpcContext> {
-  let user: User | null = null;
-
-  try {
-    user = await sdk.authenticateRequest(opts.req);
-  } catch (error) {
-    // Authentication is optional for public procedures.
-    user = null;
-  }
-
+  // This version will be used by the Express server (local dev)
+  // For Cloudflare, we use a separate context initializer in the handler
   return {
+    user: null,
     req: opts.req,
     res: opts.res,
-    user,
   };
 }

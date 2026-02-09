@@ -8,22 +8,29 @@ function isIpAddress(host: string) {
   return host.includes(":");
 }
 
-function isSecureRequest(req: Request) {
-  if (req.protocol === "https") return true;
+function isSecureRequest(req: any) {
+  if (req.protocol === "https" || (req.url && req.url.startsWith("https"))) return true;
 
-  const forwardedProto = req.headers["x-forwarded-proto"];
+  const getHeader = (name: string) => {
+    if (typeof req.get === 'function') return req.get(name);
+    if (req.headers && typeof req.headers.get === 'function') return req.headers.get(name);
+    if (req.headers) return req.headers[name.toLowerCase()];
+    return undefined;
+  };
+
+  const forwardedProto = getHeader("x-forwarded-proto");
   if (!forwardedProto) return false;
 
   const protoList = Array.isArray(forwardedProto)
     ? forwardedProto
     : forwardedProto.split(",");
 
-  return protoList.some(proto => proto.trim().toLowerCase() === "https");
+  return protoList.some((proto: any) => proto.trim().toLowerCase() === "https");
 }
 
 export function getSessionCookieOptions(
-  req: Request
-): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
+  req: any
+): any {
   // const hostname = req.hostname;
   // const shouldSetDomain =
   //   hostname &&

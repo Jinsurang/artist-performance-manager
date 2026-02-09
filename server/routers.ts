@@ -27,8 +27,10 @@ export const appRouter = router({
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      if (ctx.res && typeof ctx.res.clearCookie === 'function') {
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      }
       return {
         success: true,
       } as const;
@@ -43,13 +45,13 @@ export const appRouter = router({
           genre: z.string().optional(),
         })
       )
-      .query(async ({ input }) => {
-        return await getArtists(input.search, input.genre);
+      .query(async ({ input, ctx }) => {
+        return await getArtists(input.search, input.genre, ctx.db);
       }),
     searchPublic: publicProcedure
       .input(z.object({ name: z.string().min(1) }))
-      .query(async ({ input }) => {
-        return await searchPublicArtists(input.name);
+      .query(async ({ input, ctx }) => {
+        return await searchPublicArtists(input.name, ctx.db);
       }),
     create: publicProcedure
       .input(
@@ -64,13 +66,13 @@ export const appRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
-        return await createArtist(input);
+      .mutation(async ({ input, ctx }) => {
+        return await createArtist(input, ctx.db);
       }),
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await getArtistById(input.id);
+      .query(async ({ input, ctx }) => {
+        return await getArtistById(input.id, ctx.db);
       }),
     update: protectedProcedure
       .input(
@@ -87,19 +89,19 @@ export const appRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
-        return await updateArtist(id, data);
+        return await updateArtist(id, data, ctx.db);
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        return await deleteArtist(input.id);
+      .mutation(async ({ input, ctx }) => {
+        return await deleteArtist(input.id, ctx.db);
       }),
     getStats: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await getArtistStats(input.id);
+      .query(async ({ input, ctx }) => {
+        return await getArtistStats(input.id, ctx.db);
       }),
   }),
 
@@ -111,8 +113,8 @@ export const appRouter = router({
           endDate: z.date().optional(),
         })
       )
-      .query(async ({ input }) => {
-        return await getPerformances(input.startDate, input.endDate);
+      .query(async ({ input, ctx }) => {
+        return await getPerformances(input.startDate, input.endDate, ctx.db);
       }),
     create: protectedProcedure
       .input(
@@ -124,8 +126,8 @@ export const appRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
-        return await createPerformance(input);
+      .mutation(async ({ input, ctx }) => {
+        return await createPerformance(input, ctx.db);
       }),
     createPending: publicProcedure
       .input(
@@ -136,13 +138,13 @@ export const appRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
-        return await createPerformance({ ...input, status: "pending" });
+      .mutation(async ({ input, ctx }) => {
+        return await createPerformance({ ...input, status: "pending" }, ctx.db);
       }),
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await getPerformanceById(input.id);
+      .query(async ({ input, ctx }) => {
+        return await getPerformanceById(input.id, ctx.db);
       }),
     update: protectedProcedure
       .input(
@@ -154,17 +156,17 @@ export const appRouter = router({
           notes: z.string().optional(),
         })
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
-        return await updatePerformance(id, data);
+        return await updatePerformance(id, data, ctx.db);
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        return await deletePerformance(input.id);
+      .mutation(async ({ input, ctx }) => {
+        return await deletePerformance(input.id, ctx.db);
       }),
-    getWeekly: protectedProcedure.query(async () => {
-      return await getWeeklyPerformances();
+    getWeekly: protectedProcedure.query(async ({ ctx }) => {
+      return await getWeeklyPerformances(ctx.db);
     }),
     getMonthly: publicProcedure
       .input(
@@ -173,8 +175,8 @@ export const appRouter = router({
           month: z.number().min(1).max(12),
         })
       )
-      .query(async ({ input }) => {
-        return await getMonthlyPerformances(input.year, input.month);
+      .query(async ({ input, ctx }) => {
+        return await getMonthlyPerformances(input.year, input.month, ctx.db);
       }),
   }),
 
@@ -186,12 +188,12 @@ export const appRouter = router({
           content: z.string().min(1),
         })
       )
-      .mutation(async ({ input }) => {
-        return await createNotice(input);
+      .mutation(async ({ input, ctx }) => {
+        return await createNotice(input, ctx.db);
       }),
     list: protectedProcedure
-      .query(async () => {
-        return await getNotices();
+      .query(async ({ ctx }) => {
+        return await getNotices(ctx.db);
       }),
   }),
 });

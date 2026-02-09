@@ -7,10 +7,11 @@ import { ENV } from './_core/env';
 let _db: ReturnType<typeof drizzle> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
-export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+export async function getDb(databaseUrl?: string) {
+  const url = databaseUrl || process.env.DATABASE_URL;
+  if (!_db && url) {
     try {
-      const client = postgres(process.env.DATABASE_URL);
+      const client = postgres(url);
       _db = drizzle(client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
@@ -20,12 +21,12 @@ export async function getDb() {
   return _db;
 }
 
-export async function upsertUser(user: InsertUser): Promise<void> {
+export async function upsertUser(user: InsertUser, dbInstance?: any): Promise<void> {
   if (!user.openId) {
     throw new Error("User openId is required for upsert");
   }
 
-  const db = await getDb();
+  const db = dbInstance || await getDb();
   if (!db) {
     console.warn("[Database] Cannot upsert user: database not available");
     return;
@@ -78,8 +79,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
 }
 
-export async function getUserByOpenId(openId: string) {
-  const db = await getDb();
+export async function getUserByOpenId(openId: string, dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) {
     console.warn("[Database] Cannot get user: database not available");
     return undefined;
@@ -93,15 +94,15 @@ export async function getUserByOpenId(openId: string) {
 /**
  * Artist queries
  */
-export async function createArtist(data: InsertArtist) {
-  const db = await getDb();
+export async function createArtist(data: InsertArtist, dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) throw new Error("Database not available");
   const [newArtist] = await db.insert(artists).values(data).returning();
   return newArtist;
 }
 
-export async function getArtists(search?: string, genre?: string) {
-  const db = await getDb();
+export async function getArtists(search?: string, genre?: string, dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) return [];
 
   let query = db.select().from(artists).$dynamic();
@@ -116,8 +117,8 @@ export async function getArtists(search?: string, genre?: string) {
   return await query;
 }
 
-export async function searchPublicArtists(name: string) {
-  const db = await getDb();
+export async function searchPublicArtists(name: string, dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) return [];
 
   return await db.select({
@@ -130,21 +131,21 @@ export async function searchPublicArtists(name: string) {
     .limit(10);
 }
 
-export async function getArtistById(id: number) {
-  const db = await getDb();
+export async function getArtistById(id: number, dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) return undefined;
   const result = await db.select().from(artists).where(eq(artists.id, id)).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
-export async function updateArtist(id: number, data: Partial<InsertArtist>) {
-  const db = await getDb();
+export async function updateArtist(id: number, data: Partial<InsertArtist>, dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) throw new Error("Database not available");
   return await db.update(artists).set(data).where(eq(artists.id, id));
 }
 
-export async function deleteArtist(id: number) {
-  const db = await getDb();
+export async function deleteArtist(id: number, dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) throw new Error("Database not available");
   return await db.delete(artists).where(eq(artists.id, id));
 }
@@ -152,15 +153,15 @@ export async function deleteArtist(id: number) {
 /**
  * Performance queries
  */
-export async function createPerformance(data: InsertPerformance) {
-  const db = await getDb();
+export async function createPerformance(data: InsertPerformance, dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) throw new Error("Database not available");
   const [newPerformance] = await db.insert(performances).values(data).returning();
   return newPerformance;
 }
 
-export async function getPerformances(startDate?: Date, endDate?: Date) {
-  const db = await getDb();
+export async function getPerformances(startDate?: Date, endDate?: Date, dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) return [];
 
   let query = db.select().from(performances).$dynamic();
@@ -174,27 +175,27 @@ export async function getPerformances(startDate?: Date, endDate?: Date) {
   return await query.orderBy(performances.performanceDate);
 }
 
-export async function getPerformanceById(id: number) {
-  const db = await getDb();
+export async function getPerformanceById(id: number, dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) return undefined;
   const result = await db.select().from(performances).where(eq(performances.id, id)).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
-export async function updatePerformance(id: number, data: Partial<InsertPerformance>) {
-  const db = await getDb();
+export async function updatePerformance(id: number, data: Partial<InsertPerformance>, dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) throw new Error("Database not available");
   return await db.update(performances).set(data).where(eq(performances.id, id));
 }
 
-export async function deletePerformance(id: number) {
-  const db = await getDb();
+export async function deletePerformance(id: number, dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) throw new Error("Database not available");
   return await db.delete(performances).where(eq(performances.id, id));
 }
 
-export async function getArtistStats(artistId: number) {
-  const db = await getDb();
+export async function getArtistStats(artistId: number, dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) return { totalPerformances: 0, completedPerformances: 0, upcomingPerformances: 0 };
 
   const result = await db.select().from(performances).where(eq(performances.artistId, artistId));
@@ -202,13 +203,13 @@ export async function getArtistStats(artistId: number) {
 
   return {
     totalPerformances: result.length,
-    completedPerformances: result.filter(p => p.status === 'completed').length,
-    upcomingPerformances: result.filter(p => p.performanceDate > now && p.status !== 'cancelled').length,
+    completedPerformances: result.filter((p: any) => p.status === 'completed').length,
+    upcomingPerformances: result.filter((p: any) => p.performanceDate > now && p.status !== 'cancelled').length,
   };
 }
 
-export async function getWeeklyPerformances() {
-  const db = await getDb();
+export async function getWeeklyPerformances(dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) return [];
 
   const now = new Date();
@@ -219,8 +220,8 @@ export async function getWeeklyPerformances() {
     .orderBy(performances.performanceDate);
 }
 
-export async function getMonthlyPerformances(year: number, month: number) {
-  const db = await getDb();
+export async function getMonthlyPerformances(year: number, month: number, dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) return [];
 
   const startDate = new Date(year, month - 1, 1);
@@ -234,14 +235,14 @@ export async function getMonthlyPerformances(year: number, month: number) {
 /**
  * Notice queries
  */
-export async function createNotice(data: InsertNotice) {
-  const db = await getDb();
+export async function createNotice(data: InsertNotice, dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) throw new Error("Database not available");
   return await db.insert(notices).values(data);
 }
 
-export async function getNotices() {
-  const db = await getDb();
+export async function getNotices(dbInstance?: any) {
+  const db = dbInstance || await getDb();
   if (!db) return [];
   return await db.select().from(notices).orderBy(sql`notices.created_at DESC`);
 }

@@ -256,16 +256,18 @@ class SDKServer {
     } as GetUserInfoWithJwtResponse;
   }
 
-  async authenticateRequest(req: Request): Promise<User> {
+  async authenticateRequest(reqOrCookie: any, dbInstance?: any): Promise<User> {
+    const cookieHeader = typeof reqOrCookie === 'string' ? reqOrCookie : (reqOrCookie as any)?.headers?.cookie;
+
     // Regular authentication flow
-    const cookies = this.parseCookies(req.headers.cookie);
+    const cookies = this.parseCookies(cookieHeader);
     const sessionCookie = cookies.get(COOKIE_NAME);
     const session = await this.verifySession(sessionCookie);
 
     if (!session) {
       if (!ENV.oAuthServerUrl && process.env.NODE_ENV === "development") {
         console.warn("[Auth] No session found on localhost. Using mock user for development.");
-        let mockUser = await db.getUserByOpenId("dev_user");
+        let mockUser = await db.getUserByOpenId("dev_user", dbInstance);
         if (!mockUser) {
           await db.upsertUser({
             openId: "dev_user",
@@ -273,8 +275,8 @@ class SDKServer {
             email: "dev@example.com",
             loginMethod: "localhost",
             lastSignedIn: new Date(),
-          });
-          mockUser = await db.getUserByOpenId("dev_user");
+          }, dbInstance);
+          mockUser = await db.getUserByOpenId("dev_user", dbInstance);
         }
         return mockUser!;
       }
@@ -283,7 +285,7 @@ class SDKServer {
 
     const sessionUserId = session.openId;
     const signedInAt = new Date();
-    let user = await db.getUserByOpenId(sessionUserId);
+    let user = await db.getUserByOpenId(sessionUserId, dbInstance);
 
     // If user not in DB, sync from OAuth server automatically
     if (!user) {
@@ -295,8 +297,8 @@ class SDKServer {
           email: userInfo.email ?? null,
           loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
           lastSignedIn: signedInAt,
-        });
-        user = await db.getUserByOpenId(userInfo.openId);
+        }, dbInstance);
+        user = await db.getUserByOpenId(userInfo.openId, dbInstance);
       } catch (error) {
         console.error("[Auth] Failed to sync user from OAuth:", error);
         throw ForbiddenError("Failed to sync user info");
@@ -310,7 +312,7 @@ class SDKServer {
     await db.upsertUser({
       openId: user.openId,
       lastSignedIn: signedInAt,
-    });
+    }, dbInstance);
 
     return user;
   }
