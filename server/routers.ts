@@ -191,9 +191,14 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         return await createNotice(input, ctx.db);
       }),
-    list: protectedProcedure
+    list: publicProcedure
       .query(async ({ ctx }) => {
         return await getNotices(ctx.db);
+      }),
+    getLatest: publicProcedure
+      .query(async ({ ctx }) => {
+        const notices = await getNotices(ctx.db);
+        return notices[0] || null;
       }),
   }),
 });

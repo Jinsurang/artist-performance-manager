@@ -78,6 +78,9 @@ export default function Home() {
   const [selectedArtistInstruments, setSelectedArtistInstruments] = useState<string>("");
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
 
+  const [noticeForm, setNoticeForm] = useState({ title: "", content: "" });
+  const [isNoticeOpen, setIsNoticeOpen] = useState(false);
+
   const [artistForm, setArtistForm] = useState({
     name: "",
     genres: [] as string[],
@@ -127,6 +130,8 @@ export default function Home() {
   const createPerformance = trpc.performance.create.useMutation();
   const createPending = trpc.performance.createPending.useMutation();
   const deletePerformance = trpc.performance.delete.useMutation();
+  const createNotice = trpc.notice.create.useMutation();
+  const { data: latestNotice } = trpc.notice.getLatest.useQuery();
 
   const handleAdminLogin = () => {
     if (password === "6009") {
@@ -144,6 +149,21 @@ export default function Home() {
     setIsAdmin(false);
     localStorage.removeItem('isAdmin');
     toast.success("로그아웃되었습니다.");
+  };
+
+  const handleCreateNotice = async () => {
+    if (!noticeForm.title || !noticeForm.content) {
+      toast.error("제목과 내용을 모두 입력해주세요.");
+      return;
+    }
+    try {
+      await createNotice.mutateAsync(noticeForm);
+      toast.success("공지가 등록되었습니다.");
+      setNoticeForm({ title: "", content: "" });
+      setIsNoticeOpen(false);
+    } catch (error) {
+      toast.error("공지 등록에 실패했습니다.");
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -371,7 +391,7 @@ export default function Home() {
 
           {isAdmin ? (
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className={`rounded-xl h-9 w-9 ${tab === 'notifications' ? 'bg-primary/10 text-primary' : ''}`} onClick={() => setTab("notifications")}>
+              <Button variant="ghost" size="icon" className="rounded-xl h-9 w-9" onClick={() => setIsNoticeOpen(true)}>
                 <Bell className="h-4 w-4" />
               </Button>
               <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold border-red-100 text-red-600 hover:bg-red-50" onClick={handleAdminLogout}>로그아웃</Button>
@@ -387,6 +407,21 @@ export default function Home() {
       <main className="container py-6 px-4 max-w-xl mx-auto flex-1 space-y-6">
         {!isAdmin ? (
           <>
+            {/* Latest Notice Banner */}
+            {latestNotice && (
+              <Card className="shadow-none border-emerald-200 rounded-2xl overflow-hidden bg-emerald-50">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <Bell className="h-5 w-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-sm text-emerald-900 mb-1">{latestNotice.title}</h4>
+                      <p className="text-xs text-emerald-700 whitespace-pre-wrap">{latestNotice.content}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Artist Search & Selection */}
             <Card className="shadow-none border-primary/10 rounded-3xl overflow-hidden bg-white">
               <CardHeader className="p-6 bg-primary/5 pb-4">
@@ -605,6 +640,44 @@ export default function Home() {
           <div className="space-y-3 pt-2">
             <Input type="password" placeholder="Passcode" className="h-11 rounded-xl text-center font-black tracking-widest bg-slate-50 border-none" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAdminLogin()} />
             <Button className="w-full h-11 rounded-xl font-black text-xs" onClick={handleAdminLogin}>UNLOCK</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Notification Dialog */}
+      <Dialog open={isNoticeOpen} onOpenChange={setIsNoticeOpen}>
+        <DialogContent className="max-w-md rounded-3xl p-6 border-none">
+          <DialogHeader>
+            <DialogTitle className="font-black text-lg flex items-center gap-2">
+              <Bell className="h-5 w-5 text-primary" />
+              \uacf5\uc9c0 \uc791\uc131
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-1">
+              <Label className="text-[10px] font-black opacity-40">TITLE</Label>
+              <Input
+                className="h-10 rounded-xl bg-slate-50 border-none"
+                placeholder="\uacf5\uc9c0 \uc81c\ubaa9"
+                value={noticeForm.title}
+                onChange={e => setNoticeForm({ ...noticeForm, title: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-black opacity-40">CONTENT</Label>
+              <Textarea
+                className="rounded-xl bg-slate-50 border-none min-h-[150px]"
+                placeholder="\uacf5\uc9c0 \ub0b4\uc6a9"
+                value={noticeForm.content}
+                onChange={e => setNoticeForm({ ...noticeForm, content: e.target.value })}
+              />
+            </div>
+            <Button
+              className="w-full h-12 rounded-2xl font-black text-sm"
+              onClick={handleCreateNotice}
+            >
+              \uacf5\uc9c0 \ub4f1\ub85d
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
