@@ -160,12 +160,16 @@ export default function Home() {
       return;
     }
     try {
+      console.log('[DEBUG] Creating notice with data:', noticeForm);
       await createNotice.mutateAsync(noticeForm);
       toast.success("공지가 등록되었습니다.");
       setNoticeForm({ title: "", content: "" });
       setIsNoticeOpen(false);
-    } catch (error) {
-      toast.error("공지 등록에 실패했습니다.");
+    } catch (error: any) {
+      console.error('[DEBUG] Notice creation failed:', error);
+      console.error('[DEBUG] Error message:', error?.message);
+      console.error('[DEBUG] Error details:', JSON.stringify(error, null, 2));
+      toast.error(`공지 등록 실패: ${error?.message || '알 수 없는 오류'}`);
     }
   };
 
