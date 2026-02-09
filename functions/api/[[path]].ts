@@ -18,7 +18,7 @@ export const onRequest: any = async (context: any) => {
 
                 let user = null;
                 try {
-                    user = await sdk.authenticateRequest(request.headers.get('cookie') || undefined, db);
+                    user = await sdk.authenticateRequest(request.headers.get('cookie') || undefined, db, env);
                 } catch (e) {
                     // Auth is optional for public procedures
                 }

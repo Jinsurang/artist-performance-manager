@@ -1,3 +1,5 @@
+import { getDb } from "../db";
+import { sdk } from "./sdk";
 import type { User } from "../../drizzle/schema";
 
 export type TrpcContext = {
@@ -12,9 +14,17 @@ export async function createContext(
   opts: any
 ): Promise<TrpcContext> {
   // This version will be used by the Express server (local dev)
-  // For Cloudflare, we use a separate context initializer in the handler
+  const db = await getDb();
+  let user = null;
+  try {
+    user = await sdk.authenticateRequest(opts.req, db);
+  } catch (e) {
+    // Authentication is optional
+  }
+
   return {
-    user: null,
+    user,
+    db,
     req: opts.req,
     res: opts.res,
   };
