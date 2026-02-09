@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1770620826446,
+      "tag": "0000_jazzy_rachel_grey",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1770620986553,
+      "tag": "0001_ancient_pyro",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1770621892666,
+      "tag": "0002_tough_korg",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1770622606256,
+      "tag": "0003_nebulous_rick_jones",
+      "breakpoints": true
+    }
+  ]
+}
