@@ -13,23 +13,15 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb(databaseUrl?: string) {
   const url = databaseUrl || safeProcessEnv.DATABASE_URL;
 
-  if (!_db) {
-    if (!url) {
-      console.error("[Database] No DATABASE_URL found in env or arguments");
-      return null;
-    }
-
+  if (!_db && url) {
     try {
-      console.log("[Database] Connecting to Postgres...");
       const client = postgres(url, {
         ssl: 'require',
-        connect_timeout: 10,
       });
       _db = drizzle(client);
-      console.log("[Database] Drizzle initialized");
-    } catch (error: any) {
-      console.error("[Database] Initialization error:", error);
-      throw new Error(`DB Connect Fail: ${error?.message || "Unknown error"}`);
+    } catch (error) {
+      console.error("[Database] Failed to connect:", error);
+      _db = null;
     }
   }
 
