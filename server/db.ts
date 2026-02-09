@@ -13,14 +13,12 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb(databaseUrl?: string) {
   const url = databaseUrl || safeProcessEnv.DATABASE_URL;
 
-  if (!_db && url) {
+  if (!_db && url && typeof url === 'string') {
     try {
-      const client = postgres(url, {
-        ssl: 'require',
-      });
+      const client = postgres(url, { ssl: 'require' });
       _db = drizzle(client);
     } catch (error) {
-      console.error("[Database] Failed to connect:", error);
+      console.error("[Database] Connection failed:", error);
       _db = null;
     }
   }
@@ -103,21 +101,9 @@ export async function getUserByOpenId(openId: string, dbInstance?: any) {
  */
 export async function createArtist(data: InsertArtist, dbInstance?: any) {
   const db = dbInstance || await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error("데이터베이스 정보를 불러올 수 없습니다. 설정을 확인해 주세요.");
 
-  // Explicitly map fields and handle undefined as null to avoid SQL param mismatch
-  const values: any = {
-    name: data.name,
-    genre: data.genre,
-    phone: data.phone ?? null,
-    instagram: data.instagram ?? null,
-    grade: data.grade ?? null,
-    availableTime: data.availableTime ?? null,
-    instruments: data.instruments ?? null,
-    notes: data.notes ?? null,
-  };
-
-  const [newArtist] = await db.insert(artists).values(values).returning();
+  const [newArtist] = await db.insert(artists).values(data).returning();
   return newArtist;
 }
 
