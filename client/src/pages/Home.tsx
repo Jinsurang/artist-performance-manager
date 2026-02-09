@@ -651,7 +651,28 @@ export default function Home() {
             {
               tab === 'artists' && (
                 <div className="space-y-4">
-                  <Input placeholder="Search name..." value={artistSearch} onChange={e => setArtistSearch(e.target.value)} className="h-10 rounded-xl bg-slate-50 border-none" />
+                  <div className="flex items-center gap-3">
+                    <Input placeholder="Search name..." value={artistSearch} onChange={e => setArtistSearch(e.target.value)} className="flex-1 h-10 rounded-xl bg-slate-50 border-none" />
+                    <Button
+                      onClick={() => {
+                        setEditingArtist(null);
+                        setArtistForm({
+                          name: "",
+                          genres: [],
+                          phone: "",
+                          instagram: "",
+                          grade: "",
+                          availableTime: "",
+                          instruments: {},
+                          notes: ""
+                        });
+                        setIsArtistOpen(true);
+                      }}
+                      className="h-10 rounded-xl font-bold text-xs whitespace-nowrap"
+                    >
+                      + 아티스트 추가
+                    </Button>
+                  </div>
                   <div className="grid grid-cols-1 gap-3">
                     {filteredArtists.map(a => <ArtistCard key={a.id} artist={a} onToggleFavorite={handleToggleFavorite} onEdit={handleEditArtist} onDelete={handleDeleteArtist} getGenreColor={(g) => getGenreStyles(g).bg} />)}
                   </div>
@@ -678,7 +699,7 @@ export default function Home() {
           <DialogHeader>
             <DialogTitle className="font-black text-lg flex items-center gap-2">
               <Bell className="h-5 w-5 text-primary" />
-              \uacf5\uc9c0 \uc791\uc131
+              공지 작성
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-4">
@@ -686,7 +707,7 @@ export default function Home() {
               <Label className="text-[10px] font-black opacity-40">TITLE</Label>
               <Input
                 className="h-10 rounded-xl bg-slate-50 border-none"
-                placeholder="\uacf5\uc9c0 \uc81c\ubaa9"
+                placeholder="공지 제목"
                 value={noticeForm.title}
                 onChange={e => setNoticeForm({ ...noticeForm, title: e.target.value })}
               />
@@ -695,7 +716,7 @@ export default function Home() {
               <Label className="text-[10px] font-black opacity-40">CONTENT</Label>
               <Textarea
                 className="rounded-xl bg-slate-50 border-none min-h-[150px]"
-                placeholder="\uacf5\uc9c0 \ub0b4\uc6a9"
+                placeholder="공지 내용"
                 value={noticeForm.content}
                 onChange={e => setNoticeForm({ ...noticeForm, content: e.target.value })}
               />
@@ -704,7 +725,7 @@ export default function Home() {
               className="w-full h-12 rounded-2xl font-black text-sm"
               onClick={handleCreateNotice}
             >
-              \uacf5\uc9c0 \ub4f1\ub85d
+              공지 등록
             </Button>
           </div>
         </DialogContent>
@@ -715,7 +736,7 @@ export default function Home() {
         <DialogContent className="max-w-md rounded-3xl p-6 border-none">
           <DialogHeader>
             <DialogTitle className="font-black text-lg">
-              {selectedPerformanceDay && format(selectedPerformanceDay, 'M\uc6d4 d\uc77c')} \uacf5\uc5f0 \ucd94\uac00
+              {selectedPerformanceDay && format(selectedPerformanceDay, 'M월 d일')} 공연 추가
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-4">
@@ -726,7 +747,7 @@ export default function Home() {
                 onValueChange={(value) => setSelectedArtistForPerformance(parseInt(value))}
               >
                 <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-none">
-                  <SelectValue placeholder="\uc544\ud2f0\uc2a4\ud2b8 \uc120\ud0dd" />
+                  <SelectValue placeholder="아티스트 선택" />
                 </SelectTrigger>
                 <SelectContent>
                   {artists?.map((artist: any) => (
@@ -741,28 +762,28 @@ export default function Home() {
               className="w-full h-12 rounded-2xl font-black text-sm"
               onClick={async () => {
                 if (!selectedArtistForPerformance || !selectedPerformanceDay) {
-                  toast.error('\uc544\ud2f0\uc2a4\ud2b8\ub97c \uc120\ud0dd\ud574\uc8fc\uc138\uc694.');
+                  toast.error('아티스트를 선택해주세요.');
                   return;
                 }
                 try {
                   const selectedArtist = artists?.find((a: any) => a.id === selectedArtistForPerformance);
                   await createPerformance.mutateAsync({
                     artistId: selectedArtistForPerformance,
-                    title: `${selectedArtist?.name} \uacf5\uc5f0`,
+                    title: `${selectedArtist?.name} 공연`,
                     performanceDate: selectedPerformanceDay,
                     status: 'confirmed',
-                    notes: '\uad00\ub9ac\uc790 \uc9c1\uc811 \ucd94\uac00'
+                    notes: '관리자 직접 추가'
                   });
-                  toast.success('\uacf5\uc5f0\uc774 \ucd94\uac00\ub418\uc5c8\uc2b5\ub2c8\ub2e4.');
+                  toast.success('공연이 추가되었습니다.');
                   setIsPerformanceDialogOpen(false);
                   setSelectedArtistForPerformance(null);
                   refetchMonthlyPerfs();
                 } catch (error) {
-                  toast.error('\uacf5\uc5f0 \ucd94\uac00\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.');
+                  toast.error('공연 추가에 실패했습니다.');
                 }
               }}
             >
-              \uacf5\uc5f0 \ucd94\uac00
+              공연 추가
             </Button>
           </div>
         </DialogContent>
@@ -774,7 +795,7 @@ export default function Home() {
           <DialogHeader>
             <DialogTitle className="font-black text-lg flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-primary" />
-              \uba54\uc2dc\uc9c0 \ud15c\ud50c\ub9bf
+              메시지 템플릿
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-4">
@@ -782,24 +803,24 @@ export default function Home() {
               <Label className="text-[10px] font-black opacity-40">TEMPLATE MESSAGE</Label>
               <Textarea
                 className="rounded-xl bg-slate-50 border-none min-h-[200px]"
-                placeholder="\uc548\ub155\ud558\uc138\uc694, \uc791\uc740\ub530\uc634\ud45c\uc785\ub2c8\ub2e4...\n\n\ub2e4\uc74c \ub2ec \uacf5\uc5f0 \uc2e0\uccad\uc744 \ubc1b\uc2b5\ub2c8\ub2e4."
+                placeholder="안녕하세요, 작은따옴표입니다...&#10;&#10;다음 달 공연 신청을 받습니다."
                 value={messageTemplate}
                 onChange={e => setMessageTemplate(e.target.value)}
               />
             </div>
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
               <p className="text-[10px] text-amber-700 font-medium">
-                💡 \uc774 \ud15c\ud50c\ub9bf\uc740 \ub9e4\ub2ec \uc544\ud2f0\uc2a4\ud2b8\ub4e4\uc5d0\uac8c \uacf5\uc5f0 \uc2e0\uccad\uc744 \uc694\uccad\ud560 \ub54c \uc0ac\uc6a9\ub429\ub2c8\ub2e4.
+                💡 이 템플릿은 매달 아티스트들에게 공연 신청을 요청할 때 사용됩니다.
               </p>
             </div>
             <Button
               className="w-full h-12 rounded-2xl font-black text-sm"
               onClick={() => {
-                toast.success('\ud15c\ud50c\ub9bf\uc774 \uc800\uc7a5\ub418\uc5c8\uc2b5\ub2c8\ub2e4.');
+                toast.success('템플릿이 저장되었습니다.');
                 setIsTemplateOpen(false);
               }}
             >
-              \ud15c\ud50c\ub9bf \uc800\uc7a5
+              템플릿 저장
             </Button>
           </div>
         </DialogContent>
