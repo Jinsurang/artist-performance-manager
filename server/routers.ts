@@ -20,6 +20,8 @@ import {
   getMonthlyPerformances,
   createNotice,
   getNotices,
+  updateNotice,
+  deleteNotice,
   searchPublicArtists,
   upsertUser,
   getSetting,
@@ -228,6 +230,23 @@ export const appRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         return await createNotice(input, ctx.db);
+      }),
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          title: z.string().min(1).optional(),
+          content: z.string().min(1).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const { id, ...data } = input;
+        return await updateNotice(id, data, ctx.db);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        return await deleteNotice(input.id, ctx.db);
       }),
     list: publicProcedure
       .query(async ({ ctx }) => {

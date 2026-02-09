@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { Plus, Trash2, Edit2, Bell, Star, ChevronLeft, ChevronRight, Search, Calendar, Users, Settings, Lock, Unlock, MessageSquare, Check, X, ShieldCheck } from "lucide-react";
+import { Plus, Trash2, Edit2, Bell, Star, ChevronLeft, ChevronRight, Search, Calendar, Users, Settings, Lock, Unlock, MessageSquare, Check, X, ShieldCheck, Instagram } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -124,10 +124,13 @@ export default function Home() {
     notes: "",
   });
 
+  const [selectedPerformanceToEdit, setSelectedPerformanceToEdit] = useState<any>(null);
+  const [isEditPerformanceOpen, setIsEditPerformanceOpen] = useState(false);
   const [performanceForm, setPerformanceForm] = useState({
     artistId: "",
     timeSlot: "",
     notes: "",
+    status: "scheduled"
   });
 
   const [messageTemplate, setMessageTemplate] = useState("");
@@ -137,7 +140,10 @@ export default function Home() {
     return nextMonth;
   });
   const [selectedGenre, setSelectedGenre] = useState<string>("");
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [artistSearch, setArtistSearch] = useState("");
+  const [editingNotice, setEditingNotice] = useState<any>(null);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -160,10 +166,13 @@ export default function Home() {
   const deleteArtist = trpc.artist.delete.useMutation();
   const toggleFavorite = trpc.artist.update.useMutation();
   const createPerformance = trpc.performance.create.useMutation();
+  const updatePerformance = trpc.performance.update.useMutation();
   const createPending = trpc.performance.createPending.useMutation();
   const deletePerformance = trpc.performance.delete.useMutation();
   const createNotice = trpc.notice.create.useMutation();
-  const { data: latestNotice } = trpc.notice.getLatest.useQuery();
+  const updateNotice = trpc.notice.update.useMutation();
+  const deleteNotice = trpc.notice.delete.useMutation();
+  const { data: latestNotice, refetch: refetchNotices } = trpc.notice.getLatest.useQuery();
   const adminLogin = trpc.auth.adminLogin.useMutation();
   const getSetting = trpc.settings.get.useQuery({ key: "message_template" }, {
     enabled: isAdmin,
@@ -208,16 +217,34 @@ export default function Home() {
       return;
     }
     try {
-      console.log('[DEBUG] Creating notice with data:', noticeForm);
-      await createNotice.mutateAsync(noticeForm);
-      toast.success("공지가 등록되었습니다.");
+      if (editingNotice) {
+        await updateNotice.mutateAsync({
+          id: editingNotice.id,
+          title: noticeForm.title,
+          content: noticeForm.content
+        });
+        toast.success("공지가 수정되었습니다.");
+      } else {
+        await createNotice.mutateAsync(noticeForm);
+        toast.success("공지가 등록되었습니다.");
+      }
       setNoticeForm({ title: "", content: "" });
+      setEditingNotice(null);
       setIsNoticeOpen(false);
+      refetchNotices();
     } catch (error: any) {
-      console.error('[DEBUG] Notice creation failed:', error);
-      console.error('[DEBUG] Error message:', error?.message);
-      console.error('[DEBUG] Error details:', JSON.stringify(error, null, 2));
-      toast.error(`공지 등록 실패: ${error?.message || '알 수 없는 오류'}`);
+      toast.error(`작업 실패: ${error?.message || '알 수 없는 오류'}`);
+    }
+  };
+
+  const handleDeleteNotice = async (id: number) => {
+    if (!confirm("정말 이 공지를 삭제하시겠습니까?")) return;
+    try {
+      await deleteNotice.mutateAsync({ id });
+      toast.success("공지가 삭제되었습니다.");
+      refetchNotices();
+    } catch (error) {
+      toast.error("삭제 실패");
     }
   };
 
@@ -282,9 +309,12 @@ export default function Home() {
   const filteredArtists = artists && Array.isArray(artists) ? artists.map((a: any) => ({
     ...a,
     genres: typeof a.genre === 'string' ? a.genre.split(',').filter(Boolean) : []
-  })).filter((a: any) =>
-    a.name.toLowerCase().includes(artistSearch.toLowerCase())
-  ) : [];
+  })).filter((a: any) => {
+    const matchesSearch = a.name.toLowerCase().includes(artistSearch.toLowerCase());
+    const matchesGenre = selectedGenres.length === 0 || a.genres.some((g: string) => selectedGenres.includes(g));
+    const matchesFavorite = !showFavoritesOnly || a.isFavorite;
+    return matchesSearch && matchesGenre && matchesFavorite;
+  }) : [];
 
   const handleEditArtist = (artist: Artist) => {
     // ... existing implementation
@@ -442,20 +472,24 @@ export default function Home() {
                       onClick={(e) => {
                         if (isAdminView) {
                           e.stopPropagation();
-                          if (confirm(`"${p.title}" 공연을 삭제하시겠습니까?`)) {
-                            deletePerformance.mutate({ id: p.id }, {
-                              onSuccess: () => {
-                                toast.success('공연이 삭제되었습니다.');
-                                refetchMonthlyPerfs();
-                              },
-                              onError: () => toast.error('삭제 실패')
-                            });
-                          }
+                          setSelectedPerformanceToEdit(p);
+                          setPerformanceForm({
+                            artistId: p.artistId?.toString() || "",
+                            timeSlot: "",
+                            notes: p.notes || "",
+                            status: p.status
+                          });
+                          setIsEditPerformanceOpen(true);
                         }
                       }}
-                      className={`text-[8px] sm:text-[9px] px-1 py-0.5 rounded border font-bold truncate ${p.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse' : 'bg-emerald-50 text-emerald-700 border-emerald-100'} ${isAdminView ? 'hover:bg-red-100 hover:border-red-300 cursor-pointer' : ''}`}
+                      className={`text-[8px] sm:text-[9px] px-1 py-0.5 rounded border font-bold truncate ${p.artistGenre && GENRE_COLORS[p.artistGenre]
+                        ? `${GENRE_COLORS[p.artistGenre].bg} ${GENRE_COLORS[p.artistGenre].text} ${GENRE_COLORS[p.artistGenre].border}`
+                        : p.status === 'pending'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                        } ${isAdminView ? 'hover:opacity-80 cursor-pointer' : ''}`}
                     >
-                      {p.status === 'pending' ? '⌛ ' : '✅ '}{p.title.split(' ')[0]}
+                      {p.status === 'pending' ? '⌛ ' : ''}{p.title.split(' ')[0]}
                     </div>
                   ))}
                   {!isPast && (
@@ -489,9 +523,6 @@ export default function Home() {
             <h1 className="text-lg font-black tracking-tighter text-primary uppercase">
               작은따옴표
             </h1>
-            <div className="bg-orange-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black animate-pulse">
-              V3.0 RENDER MIGRATION
-            </div>
           </div>
 
           {isAdmin ? (
@@ -499,7 +530,11 @@ export default function Home() {
               <Button variant="ghost" size="icon" className="rounded-xl h-9 w-9" onClick={() => setIsTemplateOpen(true)}>
                 <MessageSquare className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="rounded-xl h-9 w-9" onClick={() => setIsNoticeOpen(true)}>
+              <Button variant="ghost" size="icon" className="rounded-xl h-9 w-9" onClick={() => {
+                setEditingNotice(null);
+                setNoticeForm({ title: "", content: "" });
+                setIsNoticeOpen(true);
+              }}>
                 <Bell className="h-4 w-4" />
               </Button>
               <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold border-red-100 text-red-600 hover:bg-red-50" onClick={handleAdminLogout}>로그아웃</Button>
@@ -691,6 +726,32 @@ export default function Home() {
                   </div>
                 </div>
 
+                {latestNotice && (
+                  <Card className="shadow-sm border-slate-200 rounded-2xl overflow-hidden bg-white mb-6">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                       <CardTitle className="text-sm font-bold flex items-center gap-2">
+                         <Bell className="h-4 w-4 text-slate-500" />
+                         최근 공지
+                       </CardTitle>
+                       <div className="flex items-center gap-1">
+                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                           setEditingNotice(latestNotice);
+                           setNoticeForm({ title: latestNotice.title, content: latestNotice.content });
+                           setIsNoticeOpen(true);
+                         }}>
+                           <Edit2 className="h-3 w-3 text-slate-400" />
+                         </Button>
+                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteNotice(latestNotice.id)}>
+                           <Trash2 className="h-3 w-3 text-slate-400" />
+                         </Button>
+                       </div>
+                    </CardHeader>
+                    <CardContent>
+                      <h4 className="font-bold text-slate-900 mb-1">{latestNotice.title}</h4>
+                      <p className="text-xs text-slate-600 whitespace-pre-wrap">{latestNotice.content}</p>
+                    </CardContent>
+                  </Card>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <Card className="p-4 rounded-2xl border-none bg-blue-50/50">
                     <p className="text-[9px] font-black text-blue-400 uppercase">예정된 공연</p>
@@ -722,28 +783,70 @@ export default function Home() {
             {
               tab === 'artists' && (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <Input placeholder="Search name..." value={artistSearch} onChange={e => setArtistSearch(e.target.value)} className="flex-1 h-10 rounded-xl bg-slate-50 border-none" />
-                    <Button
-                      onClick={() => {
-                        setEditingArtist(null);
-                        setArtistForm({
-                          name: "",
-                          genres: [],
-                          phone: "",
-                          instagram: "",
-                          grade: "",
-                          availableTime: "",
-                          instruments: {},
-                          notes: ""
-                        });
-                        setIsArtistOpen(true);
-                      }}
-                      className="h-10 rounded-xl font-bold text-xs whitespace-nowrap"
-                    >
-                      + 아티스트 추가
-                    </Button>
-                  </div>
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-3">
+                        <Input placeholder="Search name..." value={artistSearch} onChange={e => setArtistSearch(e.target.value)} className="flex-1 h-10 rounded-xl bg-slate-50 border-none" />
+                        <Button
+                          onClick={() => {
+                            setEditingArtist(null);
+                            setArtistForm({
+                              name: "",
+                              genres: [],
+                              phone: "",
+                              instagram: "",
+                              grade: "",
+                              availableTime: "",
+                              instruments: {},
+                              notes: ""
+                            });
+                            setIsArtistOpen(true);
+                          }}
+                          className="h-10 rounded-xl font-bold text-xs whitespace-nowrap"
+                        >
+                          + 아티스트 추가
+                        </Button>
+                      </div>
+                      
+                      {/* Genre & Favorite Filters */}
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <Button
+                          variant={showFavoritesOnly ? "default" : "outline"}
+                          size="sm"
+                          className={`h-7 rounded-lg text-[10px] font-bold ${showFavoritesOnly ? 'bg-amber-400 text-white border-amber-400 hover:bg-amber-500' : 'text-slate-400 border-slate-200'}`}
+                          onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                        >
+                          <Star className={`h-3 w-3 mr-1 ${showFavoritesOnly ? 'fill-current' : ''}`} />
+                          즐겨찾기
+                        </Button>
+                        <div className="w-px h-4 bg-slate-200 mx-1" />
+                        {AVAILABLE_GENRES.map(g => (
+                          <button
+                            key={g}
+                            onClick={() => {
+                              setSelectedGenres(prev => 
+                                prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g]
+                              );
+                            }}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                              selectedGenres.includes(g) 
+                                ? getGenreStyles(g).bg + ' ring-1 ring-offset-1 ' + getGenreStyles(g).bg.replace('bg-', 'ring-')
+                                : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'
+                            }`}
+                          >
+                            {g}
+                          </button>
+                        ))}
+                        {selectedGenres.length > 0 && (
+                          <button 
+                            onClick={() => setSelectedGenres([])}
+                            className="text-[10px] text-slate-400 underline ml-auto"
+                          >
+                            필터 초기화
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   <div className="grid grid-cols-1 gap-3">
                     {filteredArtists.map(a => <ArtistCard key={a.id} artist={a} onToggleFavorite={handleToggleFavorite} onEdit={handleEditArtist} onDelete={handleDeleteArtist} getGenreColor={(g) => getGenreStyles(g).bg} />)}
                   </div>
@@ -764,211 +867,317 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      {/* Notification Dialog */}
-      <Dialog open={isNoticeOpen} onOpenChange={setIsNoticeOpen}>
-        <DialogContent className="max-w-md rounded-3xl p-6 border-none">
-          <DialogHeader>
-            <DialogTitle className="font-black text-lg flex items-center gap-2">
-              <Bell className="h-5 w-5 text-primary" />
-              공지 작성
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <div className="space-y-1">
-              <Label className="text-[10px] font-black opacity-40">TITLE</Label>
-              <Input
-                className="h-10 rounded-xl bg-slate-50 border-none"
-                placeholder="공지 제목"
-                value={noticeForm.title}
-                onChange={e => setNoticeForm({ ...noticeForm, title: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] font-black opacity-40">CONTENT</Label>
-              <Textarea
-                className="rounded-xl bg-slate-50 border-none min-h-[150px]"
-                placeholder="공지 내용"
-                value={noticeForm.content}
-                onChange={e => setNoticeForm({ ...noticeForm, content: e.target.value })}
-              />
-            </div>
-            <Button
-              className="w-full h-12 rounded-2xl font-black text-sm"
-              onClick={handleCreateNotice}
-            >
-              공지 등록
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Performance Assignment Dialog */}
-      <Dialog open={isPerformanceDialogOpen} onOpenChange={setIsPerformanceDialogOpen}>
-        <DialogContent className="max-w-md rounded-3xl p-6 border-none">
-          <DialogHeader>
-            <DialogTitle className="font-black text-lg">
-              {selectedPerformanceDay && format(selectedPerformanceDay, 'M월 d일')} 공연 추가
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <div className="space-y-1">
-              <Label className="text-[10px] font-black opacity-40">ARTIST</Label>
-              <Select
-                value={selectedArtistForPerformance?.toString() || ""}
-                onValueChange={(value) => setSelectedArtistForPerformance(parseInt(value))}
-              >
-                <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-none">
-                  <SelectValue placeholder="아티스트 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {artists?.map((artist: any) => (
-                    <SelectItem key={artist.id} value={artist.id.toString()}>
-                      {artist.name} ({artist.genre})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button
-              className="w-full h-12 rounded-2xl font-black text-sm"
-              onClick={async () => {
-                if (!selectedArtistForPerformance || !selectedPerformanceDay) {
-                  toast.error('아티스트를 선택해주세요.');
-                  return;
-                }
-                try {
-                  const selectedArtist = artists?.find((a: any) => a.id === selectedArtistForPerformance);
-                  await createPerformance.mutateAsync({
-                    artistId: selectedArtistForPerformance,
-                    title: `${selectedArtist?.name} 공연`,
-                    performanceDate: selectedPerformanceDay,
-                    status: 'confirmed',
-                    notes: '관리자 직접 추가'
-                  });
-                  toast.success('공연이 추가되었습니다.');
-                  setIsPerformanceDialogOpen(false);
-                  setSelectedArtistForPerformance(null);
-                  refetchMonthlyPerfs();
-                } catch (error) {
-                  toast.error('공연 추가에 실패했습니다.');
-                }
-              }}
-            >
-              공연 추가
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Template Dialog */}
-      <Dialog open={isTemplateOpen} onOpenChange={setIsTemplateOpen}>
-        <DialogContent className="max-w-md rounded-3xl p-6 border-none">
-          <DialogHeader>
-            <DialogTitle className="font-black text-lg flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-primary" />
-              메시지 템플릿
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <div className="space-y-1">
-              <Label className="text-[10px] font-black opacity-40">TEMPLATE MESSAGE</Label>
-              <Textarea
-                className="rounded-xl bg-slate-50 border-none min-h-[200px]"
-                placeholder="안녕하세요, 작은따옴표입니다...&#10;&#10;다음 달 공연 신청을 받습니다."
-                value={messageTemplate}
-                onChange={e => setMessageTemplate(e.target.value)}
-              />
-            </div>
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-              <p className="text-[10px] text-amber-700 font-medium">
-                💡 이 템플릿은 매달 아티스트들에게 공연 신청을 요청할 때 사용됩니다.
-              </p>
-            </div>
-            <Button
-              className="w-full h-12 rounded-2xl font-black text-sm"
-              onClick={async () => {
-                try {
-                  await updateSetting.mutateAsync({ key: "message_template", value: messageTemplate });
-                  toast.success('템플릿이 저장되었습니다.');
-                  setIsTemplateOpen(false);
-                } catch (error) {
-                  toast.error('템플릿 저장 실패');
-                }
-              }}
-            >
-              템플릿 저장
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isArtistOpen} onOpenChange={setIsArtistOpen}>
-        <DialogContent className="max-w-md rounded-3xl overflow-y-auto max-h-[85vh] p-6 border-none">
-          <DialogHeader><DialogTitle className="font-black text-lg">{editingArtist ? "정보 수정" : "아티스트 추가"}</DialogTitle></DialogHeader>
-          <div className="space-y-5 pt-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600">이름</Label><Input className="h-10 rounded-xl bg-slate-50 border border-slate-200" value={artistForm.name} onChange={e => setArtistForm({ ...artistForm, name: e.target.value })} /></div>
-              <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600">연락처</Label><Input className="h-10 rounded-xl bg-slate-50 border border-slate-200" value={artistForm.phone} onChange={e => setArtistForm({ ...artistForm, phone: e.target.value })} /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600">인스타그램 ID</Label><Input className="h-10 rounded-xl bg-slate-50 border border-slate-200" placeholder="@username" value={artistForm.instagram} onChange={e => setArtistForm({ ...artistForm, instagram: e.target.value })} /></div>
+      {/* Edit Performance Dialog */}
+        <Dialog open={isEditPerformanceOpen} onOpenChange={setIsEditPerformanceOpen}>
+          <DialogContent className="max-w-md rounded-3xl p-6 border-none">
+            <DialogHeader>
+              <DialogTitle className="font-black text-lg">공연 정보 수정</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
               <div className="space-y-1">
-                <Label className="text-[11px] font-medium text-slate-600">등급</Label>
-                <Select value={artistForm.grade} onValueChange={(value) => setArtistForm({ ...artistForm, grade: value })}>
-                  <SelectTrigger className="h-10 rounded-xl bg-slate-50 border border-slate-200">
-                    <SelectValue placeholder="등급 선택" />
+                <Label className="text-[10px] font-black opacity-40">STATUS</Label>
+                <Select
+                  value={performanceForm.status}
+                  onValueChange={(value) => setPerformanceForm({ ...performanceForm, status: value })}
+                >
+                  <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-none">
+                    <SelectValue placeholder="상태 선택" />
                   </SelectTrigger>
                   <SelectContent>
-                    {GRADE_OPTIONS.map(grade => (
-                      <SelectItem key={grade} value={grade}>{grade}</SelectItem>
+                    <SelectItem value="pending">승인 대기 (Pending)</SelectItem>
+                    <SelectItem value="scheduled">예정됨 (Scheduled)</SelectItem>
+                    <SelectItem value="confirmed">확정됨 (Confirmed)</SelectItem>
+                    <SelectItem value="completed">완료됨 (Completed)</SelectItem>
+                    <SelectItem value="cancelled">취소됨 (Cancelled)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-black opacity-40">NOTES</Label>
+                <Textarea
+                  className="rounded-xl bg-slate-50 border-none min-h-[100px]"
+                  placeholder="메모를 입력하세요"
+                  value={performanceForm.notes}
+                  onChange={e => setPerformanceForm({ ...performanceForm, notes: e.target.value })}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="destructive"
+                  className="flex-1 h-12 rounded-2xl font-black text-sm bg-red-100 text-red-600 hover:bg-red-200"
+                  onClick={async () => {
+                    if (!selectedPerformanceToEdit) return;
+                    if (!confirm("정말 이 공연을 삭제하시겠습니까?")) return;
+                    try {
+                      await deletePerformance.mutateAsync({ id: selectedPerformanceToEdit.id });
+                      toast.success("공연이 삭제되었습니다.");
+                      setIsEditPerformanceOpen(false);
+                      refetchMonthlyPerfs();
+                    } catch (e) {
+                      toast.error("삭제 실패");
+                    }
+                  }}
+                >
+                  삭제하기
+                </Button>
+                <Button
+                  className="flex-1 h-12 rounded-2xl font-black text-sm"
+                  onClick={async () => {
+                    if (!selectedPerformanceToEdit) return;
+                    try {
+                      await updatePerformance.mutateAsync({
+                        id: selectedPerformanceToEdit.id,
+                        status: performanceForm.status as any,
+                        notes: performanceForm.notes
+                      });
+                      toast.success("공연 정보가 수정되었습니다.");
+                      setIsEditPerformanceOpen(false);
+                      refetchMonthlyPerfs();
+                    } catch (e) {
+                      toast.error("수정 실패");
+                    }
+                  }}
+                >
+                  수정 완료
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Notification Dialog */}
+        <Dialog open={isNoticeOpen} onOpenChange={setIsNoticeOpen}>
+          <DialogContent className="max-w-md rounded-3xl p-6 border-none">
+            <DialogHeader>
+              <DialogTitle className="font-black text-lg flex items-center gap-2">
+                <Bell className="h-5 w-5 text-primary" />
+                {editingNotice ? "공지 수정" : "공지 작성"}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div className="space-y-1">
+                <Label className="text-[10px] font-black opacity-40">TITLE</Label>
+                <Input
+                  className="h-10 rounded-xl bg-slate-50 border-none"
+                  placeholder="공지 제목"
+                  value={noticeForm.title}
+                  onChange={e => setNoticeForm({ ...noticeForm, title: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-black opacity-40">CONTENT</Label>
+                <Textarea
+                  className="rounded-xl bg-slate-50 border-none min-h-[150px]"
+                  placeholder="공지 내용"
+                  value={noticeForm.content}
+                  onChange={e => setNoticeForm({ ...noticeForm, content: e.target.value })}
+                />
+              </div>
+              <Button
+                className="w-full h-12 rounded-2xl font-black text-sm"
+                onClick={handleCreateNotice}
+              >
+                {editingNotice ? "수정 완료" : "공지 등록"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Performance Assignment Dialog */}
+        <Dialog open={isPerformanceDialogOpen} onOpenChange={setIsPerformanceDialogOpen}>
+          <DialogContent className="max-w-md rounded-3xl p-6 border-none">
+            <DialogHeader>
+              <DialogTitle className="font-black text-lg">
+                {selectedPerformanceDay && format(selectedPerformanceDay, 'M월 d일')} 공연 추가
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black opacity-40">ARTIST</Label>
+
+                {/* Quick Genre Filter */}
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {AVAILABLE_GENRES.map(g => (
+                    <button
+                      key={g}
+                      onClick={() => setSelectedGenre(prev => prev === g ? "" : g)}
+                      className={`px-2 py-0.5 rounded text-[9px] border ${selectedGenre === g ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-400 border-slate-200'}`}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+
+                <Select
+                  value={selectedArtistForPerformance?.toString() || ""}
+                  onValueChange={(value) => setSelectedArtistForPerformance(parseInt(value))}
+                >
+                  <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-none">
+                    <SelectValue placeholder="아티스트 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {artists?.filter((a: any) => !selectedGenre || a.genres.includes(selectedGenre)).map((artist: any) => (
+                      <SelectItem key={artist.id} value={artist.id.toString()}>
+                        {artist.name} ({artist.genre})
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+              <Button
+                className="w-full h-12 rounded-2xl font-black text-sm"
+                onClick={async () => {
+                  if (!selectedArtistForPerformance || !selectedPerformanceDay) {
+                    toast.error('아티스트를 선택해주세요.');
+                    return;
+                  }
+                  try {
+                    const selectedArtist = artists?.find((a: any) => a.id === selectedArtistForPerformance);
+                    await createPerformance.mutateAsync({
+                      artistId: selectedArtistForPerformance,
+                      title: `${selectedArtist?.name} 공연`,
+                      performanceDate: selectedPerformanceDay,
+                      status: 'confirmed',
+                      notes: '관리자 직접 추가'
+                    });
+                    toast.success('공연이 추가되었습니다.');
+                    setIsPerformanceDialogOpen(false);
+                    setSelectedArtistForPerformance(null);
+                    refetchMonthlyPerfs();
+                  } catch (error) {
+                    toast.error('공연 추가에 실패했습니다.');
+                  }
+                }}
+              >
+                공연 추가
+              </Button>
             </div>
-            <div className="space-y-1">
-              <Label className="text-[11px] font-medium text-slate-600">장르</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {AVAILABLE_GENRES.map(g => {
-                  const active = artistForm.genres.includes(g);
-                  const genreColors: Record<string, string> = {
-                    '어쿠스틱': 'bg-amber-500 border-amber-500',
-                    '팝': 'bg-pink-500 border-pink-500',
-                    '재즈': 'bg-blue-500 border-blue-500',
-                    '포크': 'bg-purple-500 border-purple-500',
-                    '인디': 'bg-teal-500 border-teal-500',
-                    '락': 'bg-red-500 border-red-500',
-                    '발라드': 'bg-rose-500 border-rose-500',
-                    '브루스': 'bg-indigo-500 border-indigo-500',
-                    '기타': 'bg-gray-500 border-gray-500'
-                  };
-                  const colorClass = active ? genreColors[g] || 'bg-primary border-primary' : 'bg-white border-slate-200';
-                  return <button key={g} onClick={() => setArtistForm({ ...artistForm, genres: active ? artistForm.genres.filter(x => x !== g) : [...artistForm.genres, g] })} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${colorClass} ${active ? 'text-white' : 'text-slate-400'}`}>{g}</button>
-                })}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[11px] font-medium text-slate-600">악기</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {INSTRUMENTS.map(i => (
-                  <div key={i} className="flex flex-col items-center p-2 rounded-xl bg-slate-50 border border-slate-200">
-                    <span className="text-[8px] font-bold mb-1">{i}</span>
-                    <div className="flex items-center gap-1.5">
-                      <button onClick={() => setArtistForm({ ...artistForm, instruments: { ...artistForm.instruments, [i]: Math.max(0, (artistForm.instruments[i] || 0) - 1) } })} className="w-4 h-4 rounded bg-white border border-slate-200 text-[10px]">-</button>
-                      <span className="text-[10px] font-bold">{artistForm.instruments[i] || 0}</span>
-                      <button onClick={() => setArtistForm({ ...artistForm, instruments: { ...artistForm.instruments, [i]: (artistForm.instruments[i] || 0) + 1 } })} className="w-4 h-4 rounded bg-primary text-white text-[10px]">+</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600">메모</Label><Textarea className="rounded-xl bg-slate-50 border border-slate-200 min-h-[100px]" value={artistForm.notes} onChange={e => setArtistForm({ ...artistForm, notes: e.target.value })} /></div>
-            <Button className="w-full h-12 rounded-2xl font-black text-sm" onClick={handleSaveArtistAdmin}>변경사항 저장</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
 
-      <footer className="py-8 bg-slate-50/50"><div className="container text-center text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">Jak-Eun-Tta-Om-Pyo. Mobile Ready v3.0</div></footer>
+        {/* Template Dialog */}
+        <Dialog open={isTemplateOpen} onOpenChange={setIsTemplateOpen}>
+          <DialogContent className="max-w-md rounded-3xl p-6 border-none">
+            <DialogHeader>
+              <DialogTitle className="font-black text-lg flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-primary" />
+                메시지 템플릿
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div className="space-y-1">
+                <Label className="text-[10px] font-black opacity-40">TEMPLATE MESSAGE</Label>
+                <Textarea
+                  className="rounded-xl bg-slate-50 border-none min-h-[200px]"
+                  placeholder="안녕하세요, 작은따옴표입니다...&#10;&#10;다음 달 공연 신청을 받습니다."
+                  value={messageTemplate}
+                  onChange={e => setMessageTemplate(e.target.value)}
+                />
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <p className="text-[10px] text-amber-700 font-medium">
+                  💡 이 템플릿은 매달 아티스트들에게 공연 신청을 요청할 때 사용됩니다.
+                </p>
+              </div>
+              <Button
+                className="w-full h-12 rounded-2xl font-black text-sm"
+                onClick={async () => {
+                  try {
+                    await updateSetting.mutateAsync({ key: "message_template", value: messageTemplate });
+                    toast.success('템플릿이 저장되었습니다.');
+                    setIsTemplateOpen(false);
+                  } catch (error) {
+                    toast.error('템플릿 저장 실패');
+                  }
+                }}
+              >
+                템플릿 저장
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isArtistOpen} onOpenChange={setIsArtistOpen}>
+          <DialogContent className="max-w-md rounded-3xl overflow-y-auto max-h-[85vh] p-6 border-none">
+            <DialogHeader><DialogTitle className="font-black text-lg">{editingArtist ? "정보 수정" : "아티스트 추가"}</DialogTitle></DialogHeader>
+            <div className="space-y-5 pt-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600">이름</Label><Input className="h-10 rounded-xl bg-slate-50 border border-slate-200" value={artistForm.name} onChange={e => setArtistForm({ ...artistForm, name: e.target.value })} /></div>
+                <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600">연락처</Label><Input className="h-10 rounded-xl bg-slate-50 border border-slate-200" value={artistForm.phone} onChange={e => setArtistForm({ ...artistForm, phone: e.target.value })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600">인스타그램 ID</Label><Input className="h-10 rounded-xl bg-slate-50 border border-slate-200" placeholder="@username" value={artistForm.instagram} onChange={e => setArtistForm({ ...artistForm, instagram: e.target.value })} /></div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-medium text-slate-600">등급</Label>
+                  <Select value={artistForm.grade} onValueChange={(value) => setArtistForm({ ...artistForm, grade: value })}>
+                    <SelectTrigger className="h-10 rounded-xl bg-slate-50 border border-slate-200">
+                      <SelectValue placeholder="등급 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {GRADE_OPTIONS.map(grade => (
+                        <SelectItem key={grade} value={grade}>{grade}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] font-medium text-slate-600">장르</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {AVAILABLE_GENRES.map(g => {
+                    const active = artistForm.genres.includes(g);
+                    const genreColors: Record<string, string> = {
+                      '어쿠스틱': 'bg-amber-500 border-amber-500',
+                      '팝': 'bg-pink-500 border-pink-500',
+                      '재즈': 'bg-blue-500 border-blue-500',
+                      '포크': 'bg-purple-500 border-purple-500',
+                      '인디': 'bg-teal-500 border-teal-500',
+                      '락': 'bg-red-500 border-red-500',
+                      '발라드': 'bg-rose-500 border-rose-500',
+                      '브루스': 'bg-indigo-500 border-indigo-500',
+                      '기타': 'bg-gray-500 border-gray-500'
+                    };
+                    const colorClass = active ? genreColors[g] || 'bg-primary border-primary' : 'bg-white border-slate-200';
+                    return <button key={g} onClick={() => setArtistForm({ ...artistForm, genres: active ? artistForm.genres.filter(x => x !== g) : [...artistForm.genres, g] })} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${colorClass} ${active ? 'text-white' : 'text-slate-400'}`}>{g}</button>
+                  })}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] font-medium text-slate-600">악기</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {INSTRUMENTS.map(i => (
+                    <div key={i} className="flex flex-col items-center p-2 rounded-xl bg-slate-50 border border-slate-200">
+                      <span className="text-[8px] font-bold mb-1">{i}</span>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => setArtistForm({ ...artistForm, instruments: { ...artistForm.instruments, [i]: Math.max(0, (artistForm.instruments[i] || 0) - 1) } })} className="w-4 h-4 rounded bg-white border border-slate-200 text-[10px]">-</button>
+                        <span className="text-[10px] font-bold">{artistForm.instruments[i] || 0}</span>
+                        <button onClick={() => setArtistForm({ ...artistForm, instruments: { ...artistForm.instruments, [i]: (artistForm.instruments[i] || 0) + 1 } })} className="w-4 h-4 rounded bg-primary text-white text-[10px]">+</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600">메모</Label><Textarea className="rounded-xl bg-slate-50 border border-slate-200 min-h-[100px]" value={artistForm.notes} onChange={e => setArtistForm({ ...artistForm, notes: e.target.value })} /></div>
+              <Button className="w-full h-12 rounded-2xl font-black text-sm" onClick={handleSaveArtistAdmin}>변경사항 저장</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <footer className="py-8 bg-slate-50/50">
+          <div className="container text-center space-y-2">
+            <div className="text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">
+              @Siglemarksworld_art
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 rounded-full text-slate-300 hover:text-pink-500 hover:bg-pink-50"
+              onClick={() => window.open('https://instagram.com/Siglemarksworld_art', '_blank')}
+            >
+              <Instagram className="h-3 w-3" />
+            </Button>
+          </div>
+        </footer>
     </div >
   );
 }

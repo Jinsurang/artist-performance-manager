@@ -262,7 +262,20 @@ export async function getMonthlyPerformances(year: number, month: number, dbInst
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0, 23, 59, 59);
 
-  return await db.select().from(performances)
+  return await db.select({
+    id: performances.id,
+    artistId: performances.artistId,
+    title: performances.title,
+    performanceDate: performances.performanceDate,
+    status: performances.status,
+    notes: performances.notes,
+    createdAt: performances.createdAt,
+    updatedAt: performances.updatedAt,
+    artistName: artists.name,
+    artistGenre: artists.genre,
+  })
+    .from(performances)
+    .leftJoin(artists, eq(performances.artistId, artists.id))
     .where(sql`performances.performance_date BETWEEN ${startDate} AND ${endDate}`)
     .orderBy(performances.performanceDate);
 }
@@ -280,6 +293,18 @@ export async function getNotices(dbInstance?: any) {
   const db = dbInstance || await getDb();
   if (!db) return [];
   return await db.select().from(notices).orderBy(sql`notices.created_at DESC`);
+}
+
+export async function updateNotice(id: number, data: Partial<InsertNotice>, dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db) throw new Error("Database not available");
+  return await db.update(notices).set(data).where(eq(notices.id, id));
+}
+
+export async function deleteNotice(id: number, dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db) throw new Error("Database not available");
+  return await db.delete(notices).where(eq(notices.id, id));
 }
 
 /**
