@@ -59,6 +59,11 @@ function SearchResults({ query, onSelect }: { query: string; onSelect: (artist: 
 }
 
 export default function Home() {
+  useEffect(() => {
+    console.log("[V2.1] App Initialized");
+    console.log("[V2.1] Environment:", import.meta.env.MODE);
+  }, []);
+
   const [isAdmin, setIsAdmin] = useState(() => {
     // Restore login state from localStorage
     const saved = localStorage.getItem('isAdmin');
@@ -440,6 +445,9 @@ export default function Home() {
             <h1 className="text-lg font-black tracking-tighter text-primary uppercase">
               작은따옴표
             </h1>
+            <div className="bg-red-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black animate-pulse">
+              V2.1 LIVE
+            </div>
           </div>
 
           {isAdmin ? (
