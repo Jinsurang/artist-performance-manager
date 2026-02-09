@@ -71,6 +71,8 @@ export default function Home() {
   const [isArtistOpen, setIsArtistOpen] = useState(false);
   const [selectedPerformanceDay, setSelectedPerformanceDay] = useState<Date | null>(null);
   const [editingArtist, setEditingArtist] = useState<Artist | null>(null);
+  const [isPerformanceDialogOpen, setIsPerformanceDialogOpen] = useState(false);
+  const [selectedArtistForPerformance, setSelectedArtistForPerformance] = useState<number | null>(null);
 
   // New state for multi-date flow
   const [savedArtistId, setSavedArtistId] = useState<number | null>(null);
@@ -80,6 +82,7 @@ export default function Home() {
 
   const [noticeForm, setNoticeForm] = useState({ title: "", content: "" });
   const [isNoticeOpen, setIsNoticeOpen] = useState(false);
+  const [isTemplateOpen, setIsTemplateOpen] = useState(false);
 
   const [artistForm, setArtistForm] = useState({
     name: "",
@@ -349,7 +352,15 @@ export default function Home() {
             return (
               <div
                 key={i}
-                onClick={() => !isPast && !isAdminView && handleDateClick(date)}
+                onClick={() => {
+                  if (isPast) return;
+                  if (isAdminView) {
+                    setSelectedPerformanceDay(date);
+                    setIsPerformanceDialogOpen(true);
+                  } else {
+                    handleDateClick(date);
+                  }
+                }}
                 className={`bg-white h-20 sm:h-28 p-1 sm:p-2 border-t border-l border-primary/5 relative cursor-pointer group transition-all ${isPast ? 'opacity-40 grayscale pointer-events-none' : ''} ${isSelected ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-500 z-10' : 'hover:bg-primary/5'}`}
               >
                 <span className={`text-xs font-black ${isToday ? 'bg-primary text-white w-5 h-5 flex items-center justify-center rounded-full' : isSun ? 'text-red-500' : isSat ? 'text-blue-500' : ''}`}>
@@ -357,15 +368,38 @@ export default function Home() {
                 </span>
 
                 <div className="mt-1 space-y-1 overflow-hidden">
-                  {perfs.map((p, idx) => (
-                    <div key={idx} className={`text-[8px] sm:text-[9px] px-1 py-0.5 rounded border font-bold truncate ${p.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
+                  {perfs.map((p: any, idx: number) => (
+                    <div
+                      key={idx}
+                      onClick={(e) => {
+                        if (isAdminView) {
+                          e.stopPropagation();
+                          if (confirm(`"${p.title}" 공연을 삭제하시겠습니까?`)) {
+                            deletePerformance.mutate({ id: p.id }, {
+                              onSuccess: () => {
+                                toast.success('공연이 삭제되었습니다.');
+                                refetchMonthlyPerfs();
+                              },
+                              onError: () => toast.error('삭제 실패')
+                            });
+                          }
+                        }
+                      }}
+                      className={`text-[8px] sm:text-[9px] px-1 py-0.5 rounded border font-bold truncate ${p.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse' : 'bg-emerald-50 text-emerald-700 border-emerald-100'} ${isAdminView ? 'hover:bg-red-100 hover:border-red-300 cursor-pointer' : ''}`}
+                    >
                       {p.status === 'pending' ? '⌛ ' : '✅ '}{p.title.split(' ')[0]}
                     </div>
                   ))}
-                  {!isPast && !hasConfirmed && !isAdminView && (
-                    <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${isSelected ? 'opacity-100 bg-indigo-500/10' : 'opacity-0 group-hover:opacity-100 bg-primary/10'}`}>
-                      {isSelected ? <Check className="h-6 w-6 text-indigo-600" /> : <Plus className="h-4 w-4 text-primary" />}
-                    </div>
+                  {!isPast && (
+                    isAdminView ? (
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-primary/10 transition-opacity">
+                        <Plus className="h-4 w-4 text-primary" />
+                      </div>
+                    ) : !hasConfirmed && (
+                      <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${isSelected ? 'opacity-100 bg-indigo-500/10' : 'opacity-0 group-hover:opacity-100 bg-primary/10'}`}>
+                        {isSelected ? <Check className="h-6 w-6 text-indigo-600" /> : <Plus className="h-4 w-4 text-primary" />}
+                      </div>
+                    )
                   )}
                 </div>
               </div>
@@ -391,6 +425,9 @@ export default function Home() {
 
           {isAdmin ? (
             <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" className="rounded-xl h-9 w-9" onClick={() => setIsTemplateOpen(true)}>
+                <MessageSquare className="h-4 w-4" />
+              </Button>
               <Button variant="ghost" size="icon" className="rounded-xl h-9 w-9" onClick={() => setIsNoticeOpen(true)}>
                 <Bell className="h-4 w-4" />
               </Button>
@@ -530,9 +567,9 @@ export default function Home() {
           /* Admin View */
           <div className="space-y-6">
             <div className="flex p-1 bg-slate-100 rounded-xl">
-              {["dashboard", "artists", "notifications"].map(t => (
+              {["dashboard", "artists"].map(t => (
                 <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2 text-[10px] font-black transition-all rounded-lg ${tab === t ? 'bg-white text-primary shadow-sm' : 'text-slate-400'}`}>
-                  {t === 'dashboard' ? '일정관리' : t === 'artists' ? `아티스트${artists ? `(${artists.length})` : ''}` : '템플릿'}
+                  {t === 'dashboard' ? '일정관리' : `아티스트${artists ? `(${artists.length})` : ''}`}
                 </button>
               ))}
             </div>
@@ -619,17 +656,6 @@ export default function Home() {
                 </div>
               </div>
             )}
-
-            {tab === 'notifications' && (
-              <Card className="p-6 rounded-3xl border-none shadow-sm bg-white space-y-4">
-                <div className="space-y-1">
-                  <h4 className="text-sm font-black">메시지 템플릿</h4>
-                  <p className="text-[10px] text-slate-400">발송할 메시지 내용을 입력하세요.</p>
-                </div>
-                <Textarea className="min-h-[200px] rounded-2xl bg-slate-50 border-none" value={messageTemplate} onChange={e => setMessageTemplate(e.target.value)} placeholder="안녕하세요, 작은따옴표입니다..." />
-                <Button className="w-full h-10 rounded-xl font-bold text-xs" onClick={() => toast.success("저장되었습니다.")}>템플릿 업데이트</Button>
-              </Card>
-            )}
           </div>
         )}
       </main>
@@ -677,6 +703,101 @@ export default function Home() {
               onClick={handleCreateNotice}
             >
               \uacf5\uc9c0 \ub4f1\ub85d
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Performance Assignment Dialog */}
+      <Dialog open={isPerformanceDialogOpen} onOpenChange={setIsPerformanceDialogOpen}>
+        <DialogContent className="max-w-md rounded-3xl p-6 border-none">
+          <DialogHeader>
+            <DialogTitle className="font-black text-lg">
+              {selectedPerformanceDay && format(selectedPerformanceDay, 'M\uc6d4 d\uc77c')} \uacf5\uc5f0 \ucd94\uac00
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-1">
+              <Label className="text-[10px] font-black opacity-40">ARTIST</Label>
+              <Select
+                value={selectedArtistForPerformance?.toString() || ""}
+                onValueChange={(value) => setSelectedArtistForPerformance(parseInt(value))}
+              >
+                <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-none">
+                  <SelectValue placeholder="\uc544\ud2f0\uc2a4\ud2b8 \uc120\ud0dd" />
+                </SelectTrigger>
+                <SelectContent>
+                  {artists?.map((artist: any) => (
+                    <SelectItem key={artist.id} value={artist.id.toString()}>
+                      {artist.name} ({artist.genre})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              className="w-full h-12 rounded-2xl font-black text-sm"
+              onClick={async () => {
+                if (!selectedArtistForPerformance || !selectedPerformanceDay) {
+                  toast.error('\uc544\ud2f0\uc2a4\ud2b8\ub97c \uc120\ud0dd\ud574\uc8fc\uc138\uc694.');
+                  return;
+                }
+                try {
+                  const selectedArtist = artists?.find((a: any) => a.id === selectedArtistForPerformance);
+                  await createPerformance.mutateAsync({
+                    artistId: selectedArtistForPerformance,
+                    title: `${selectedArtist?.name} \uacf5\uc5f0`,
+                    performanceDate: selectedPerformanceDay,
+                    status: 'confirmed',
+                    notes: '\uad00\ub9ac\uc790 \uc9c1\uc811 \ucd94\uac00'
+                  });
+                  toast.success('\uacf5\uc5f0\uc774 \ucd94\uac00\ub418\uc5c8\uc2b5\ub2c8\ub2e4.');
+                  setIsPerformanceDialogOpen(false);
+                  setSelectedArtistForPerformance(null);
+                  refetchMonthlyPerfs();
+                } catch (error) {
+                  toast.error('\uacf5\uc5f0 \ucd94\uac00\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.');
+                }
+              }}
+            >
+              \uacf5\uc5f0 \ucd94\uac00
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Template Dialog */}
+      <Dialog open={isTemplateOpen} onOpenChange={setIsTemplateOpen}>
+        <DialogContent className="max-w-md rounded-3xl p-6 border-none">
+          <DialogHeader>
+            <DialogTitle className="font-black text-lg flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-primary" />
+              \uba54\uc2dc\uc9c0 \ud15c\ud50c\ub9bf
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-1">
+              <Label className="text-[10px] font-black opacity-40">TEMPLATE MESSAGE</Label>
+              <Textarea
+                className="rounded-xl bg-slate-50 border-none min-h-[200px]"
+                placeholder="\uc548\ub155\ud558\uc138\uc694, \uc791\uc740\ub530\uc634\ud45c\uc785\ub2c8\ub2e4...\n\n\ub2e4\uc74c \ub2ec \uacf5\uc5f0 \uc2e0\uccad\uc744 \ubc1b\uc2b5\ub2c8\ub2e4."
+                value={messageTemplate}
+                onChange={e => setMessageTemplate(e.target.value)}
+              />
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+              <p className="text-[10px] text-amber-700 font-medium">
+                💡 \uc774 \ud15c\ud50c\ub9bf\uc740 \ub9e4\ub2ec \uc544\ud2f0\uc2a4\ud2b8\ub4e4\uc5d0\uac8c \uacf5\uc5f0 \uc2e0\uccad\uc744 \uc694\uccad\ud560 \ub54c \uc0ac\uc6a9\ub429\ub2c8\ub2e4.
+              </p>
+            </div>
+            <Button
+              className="w-full h-12 rounded-2xl font-black text-sm"
+              onClick={() => {
+                toast.success('\ud15c\ud50c\ub9bf\uc774 \uc800\uc7a5\ub418\uc5c8\uc2b5\ub2c8\ub2e4.');
+                setIsTemplateOpen(false);
+              }}
+            >
+              \ud15c\ud50c\ub9bf \uc800\uc7a5
             </Button>
           </div>
         </DialogContent>
