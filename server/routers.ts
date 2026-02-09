@@ -3,6 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import {
   createArtist,
   getArtists,
@@ -20,11 +21,46 @@ import {
   createNotice,
   getNotices,
   searchPublicArtists,
+  upsertUser,
 } from "./db";
+import { sdk } from "./_core/sdk";
+import { ENV } from "./_core/env";
+import { ONE_YEAR_MS } from "@shared/const";
 
 export const appRouter = router({
   system: systemRouter,
   auth: router({
+    adminLogin: publicProcedure
+      .input(z.object({ passcode: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        if (input.passcode !== ENV.ownerOpenId) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Passcode incorrect" });
+        }
+
+        // Auto-create/upsert the admin user
+        await upsertUser({
+          openId: ENV.ownerOpenId,
+          name: "Administrator",
+          role: "admin",
+        }, ctx.db);
+
+        // Create session
+        const sessionToken = await sdk.createSessionToken(ENV.ownerOpenId, {
+          name: "Administrator",
+          env: ctx.env,
+        });
+
+        // Set cookie
+        if (ctx.res) {
+          const cookieOptions = getSessionCookieOptions(ctx.req);
+          ctx.res.cookie(COOKIE_NAME, sessionToken, {
+            ...cookieOptions,
+            maxAge: ONE_YEAR_MS,
+          });
+        }
+
+        return { success: true };
+      }),
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       if (ctx.res && typeof ctx.res.clearCookie === 'function') {

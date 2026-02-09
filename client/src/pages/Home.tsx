@@ -139,16 +139,24 @@ export default function Home() {
   const deletePerformance = trpc.performance.delete.useMutation();
   const createNotice = trpc.notice.create.useMutation();
   const { data: latestNotice } = trpc.notice.getLatest.useQuery();
+  const adminLogin = trpc.auth.adminLogin.useMutation();
 
-  const handleAdminLogin = () => {
-    if (password === "6009") {
-      setIsAdmin(true);
-      localStorage.setItem('isAdmin', 'true');
-      setIsLoginOpen(false);
-      setPassword("");
-      toast.success("관리자로 로그인되었습니다.");
-    } else {
-      toast.error("비밀번호가 올바르지 않습니다.");
+  const handleAdminLogin = async () => {
+    try {
+      if (password === "6009") {
+        await adminLogin.mutateAsync({ passcode: password });
+        setIsAdmin(true);
+        localStorage.setItem('isAdmin', 'true');
+        setIsLoginOpen(false);
+        setPassword("");
+        toast.success("관리자로 로그인되었습니다.");
+        refetchArtists();
+      } else {
+        toast.error("비밀번호가 올바르지 않습니다.");
+      }
+    } catch (error: any) {
+      console.error("[Auth] Admin login failed:", error);
+      toast.error("관리자 인증에 실패했습니다.");
     }
   };
 
