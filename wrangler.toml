@@ -1,0 +1,6 @@
+# Cloudflare Pages configuration
+name = "artist-performance-manager"
+
+# Enable Node.js compatibility for postgres package
+compatibility_flags = ["nodejs_compat"]
+compatibility_date = "2024-01-01"
