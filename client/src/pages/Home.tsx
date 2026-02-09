@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { Plus, Trash2, Edit2, Bell, Star, ChevronLeft, ChevronRight, Search, Calendar, Users, Settings, Lock, Unlock, MessageSquare, Check, X, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -28,6 +29,7 @@ const GENRE_COLORS: Record<string, { bg: string, text: string, border: string }>
 };
 
 const INSTRUMENTS = ["보컬", "기타", "건반", "드럼", "바이올린", "첼로", "콘트라베이스", "관악기"];
+const GRADE_OPTIONS = ["S", "A", "B", "C"];
 
 function SearchResults({ query, onSelect }: { query: string; onSelect: (artist: { id: number, name: string, instruments: string | null }) => void }) {
   const { data: results, isLoading } = trpc.artist.searchPublic.useQuery({ name: query }, { enabled: query.length > 0 });
@@ -57,7 +59,11 @@ function SearchResults({ query, onSelect }: { query: string; onSelect: (artist: 
 }
 
 export default function Home() {
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(() => {
+    // Restore login state from localStorage
+    const saved = localStorage.getItem('isAdmin');
+    return saved === 'true';
+  });
   const [password, setPassword] = useState("");
   const [isLoginOpen, setIsLoginOpen] = useState(false);
 
@@ -90,7 +96,11 @@ export default function Home() {
   });
 
   const [messageTemplate, setMessageTemplate] = useState("");
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const nextMonth = new Date();
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    return nextMonth;
+  });
   const [selectedGenre, setSelectedGenre] = useState<string>("");
   const [artistSearch, setArtistSearch] = useState("");
 
@@ -121,12 +131,19 @@ export default function Home() {
   const handleAdminLogin = () => {
     if (password === "6009") {
       setIsAdmin(true);
+      localStorage.setItem('isAdmin', 'true');
       setIsLoginOpen(false);
       setPassword("");
       toast.success("관리자로 로그인되었습니다.");
     } else {
       toast.error("비밀번호가 올바르지 않습니다.");
     }
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdmin(false);
+    localStorage.removeItem('isAdmin');
+    toast.success("로그아웃되었습니다.");
   };
 
   const handleSaveProfile = async () => {
@@ -357,7 +374,7 @@ export default function Home() {
               <Button variant="ghost" size="icon" className={`rounded-xl h-9 w-9 ${tab === 'notifications' ? 'bg-primary/10 text-primary' : ''}`} onClick={() => setTab("notifications")}>
                 <Bell className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold border-red-100 text-red-600 hover:bg-red-50" onClick={() => setIsAdmin(false)}>로그아웃</Button>
+              <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold border-red-100 text-red-600 hover:bg-red-50" onClick={handleAdminLogout}>로그아웃</Button>
             </div>
           ) : (
             <Button variant="ghost" size="sm" className="h-8 text-slate-400 font-bold text-[10px] uppercase tracking-widest" onClick={() => setIsLoginOpen(true)}>
@@ -377,8 +394,8 @@ export default function Home() {
                   <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">{isProfileSaved ? "아티스트 확인됨" : "STEP 01"}</span>
                   {isProfileSaved && <ShieldCheck className="h-4 w-4 text-emerald-500" />}
                 </div>
-                <CardTitle className="text-xl font-black">{isProfileSaved ? "아티스트 선택 완료" : "아티스트 찾기"}</CardTitle>
-                <p className="text-[11px] text-muted-foreground font-medium">등록된 아티스트 프로필을 검색하여 선택해주세요.</p>
+                <CardTitle className="text-xl font-black">{isProfileSaved ? "아티스트 선택 완료" : "아티스트 선택"}</CardTitle>
+                <p className="text-[11px] text-muted-foreground font-medium">아티스트를 검색하여 선택해주세요. <span className="text-[10px] text-slate-400">한글로 먼저 검색하고, 나오지 않으면 영어로 검색해보세요.</span></p>
               </CardHeader>
               <CardContent className="p-6 space-y-5">
                 {!isProfileSaved ? (
@@ -447,7 +464,7 @@ export default function Home() {
               <div className="flex items-center justify-between px-2">
                 <div className="space-y-0.5">
                   <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">STEP 02</span>
-                  <h3 className="text-lg font-black tracking-tighter">공연 날짜 선택</h3>
+                  <h3 className="text-lg font-black tracking-tighter">공연 신청 날짜 선택</h3>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}><ChevronLeft className="h-4 w-4" /></Button>
@@ -480,21 +497,79 @@ export default function Home() {
             <div className="flex p-1 bg-slate-100 rounded-xl">
               {["dashboard", "artists", "notifications"].map(t => (
                 <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2 text-[10px] font-black transition-all rounded-lg ${tab === t ? 'bg-white text-primary shadow-sm' : 'text-slate-400'}`}>
-                  {t === 'dashboard' ? '일정관리' : t === 'artists' ? '아티스트' : '템플릿'}
+                  {t === 'dashboard' ? '일정관리' : t === 'artists' ? `아티스트${artists ? `(${artists.length})` : ''}` : '템플릿'}
                 </button>
               ))}
             </div>
 
             {tab === 'dashboard' && (
               <div className="space-y-6">
+                {/* Year/Month Selector */}
+                <div className="flex items-center gap-3 justify-between">
+                  <div className="flex items-center gap-2">
+                    <Select value={currentMonth.getFullYear().toString()} onValueChange={(year) => {
+                      const newDate = new Date(currentMonth);
+                      newDate.setFullYear(parseInt(year));
+                      setCurrentMonth(newDate);
+                    }}>
+                      <SelectTrigger className="w-[100px] h-9 rounded-lg">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i).map(year => (
+                          <SelectItem key={year} value={year.toString()}>{year}\ub144</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={(currentMonth.getMonth() + 1).toString()} onValueChange={(month) => {
+                      const newDate = new Date(currentMonth);
+                      newDate.setMonth(parseInt(month) - 1);
+                      setCurrentMonth(newDate);
+                    }}>
+                      <SelectTrigger className="w-[90px] h-9 rounded-lg">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                          <SelectItem key={month} value={month.toString()}>{month}\uc6d4</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-lg"
+                    onClick={() => {
+                      const today = new Date();
+                      setCurrentMonth(today);
+                    }}
+                  >
+                    \uc624\ub298
+                  </Button>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <Card className="p-4 rounded-2xl border-none bg-blue-50/50">
-                    <p className="text-[9px] font-black text-blue-400 uppercase">Total confirmed</p>
-                    <h4 className="text-xl font-black text-blue-700">{upcomingMonthlyPerfs.filter(p => p.status !== 'pending').length}</h4>
+                    <p className="text-[9px] font-black text-blue-400 uppercase">예정된 공연</p>
+                    <h4 className="text-xl font-black text-blue-700">{upcomingMonthlyPerfs.filter((p: any) => p.artistId).length}</h4>
                   </Card>
                   <Card className="p-4 rounded-2xl border-none bg-amber-50/50">
-                    <p className="text-[9px] font-black text-amber-500 uppercase">New Applications</p>
-                    <h4 className="text-xl font-black text-amber-700">{upcomingMonthlyPerfs.filter(p => p.status === 'pending').length}</h4>
+                    <p className="text-[9px] font-black text-amber-500 uppercase">미지정 공연일정</p>
+                    <h4 className="text-xl font-black text-amber-700">{(() => {
+                      const daysInMonth = eachDayOfInterval({
+                        start: startOfMonth(currentMonth),
+                        end: endOfMonth(currentMonth)
+                      });
+                      const performanceDates = new Set(
+                        (monthlyPerfs || []).filter((p: any) => p.artistId).map((p: any) =>
+                          format(new Date(p.performanceDate), 'yyyy-MM-dd')
+                        )
+                      );
+                      return daysInMonth.filter(day =>
+                        day >= today && !performanceDates.has(format(day, 'yyyy-MM-dd'))
+                      ).length;
+                    })()}</h4>
                   </Card>
                 </div>
                 {renderCalendar(true)}
@@ -541,6 +616,19 @@ export default function Home() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label className="text-[10px] font-black opacity-40">NAME</Label><Input className="h-10 rounded-xl bg-slate-50 border-none" value={artistForm.name} onChange={e => setArtistForm({ ...artistForm, name: e.target.value })} /></div>
               <div className="space-y-1"><Label className="text-[10px] font-black opacity-40">PHONE</Label><Input className="h-10 rounded-xl bg-slate-50 border-none" value={artistForm.phone} onChange={e => setArtistForm({ ...artistForm, phone: e.target.value })} /></div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-black opacity-40">GRADE</Label>
+              <Select value={artistForm.grade} onValueChange={(value) => setArtistForm({ ...artistForm, grade: value })}>
+                <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-none">
+                  <SelectValue placeholder="등급 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {GRADE_OPTIONS.map(grade => (
+                    <SelectItem key={grade} value={grade}>{grade}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label className="text-[10px] font-black opacity-40">GENRES</Label>
