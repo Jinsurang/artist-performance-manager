@@ -576,49 +576,48 @@ export default function Home() {
 
             {tab === 'dashboard' && (
               <div className="space-y-6">
-                {/* Year/Month Selector */}
-                <div className="flex items-center gap-3 justify-between">
+                {/* Month Navigation */}
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-black">
+                    {currentMonth.getFullYear()}년 {currentMonth.getMonth() + 1}월
+                  </h3>
                   <div className="flex items-center gap-2">
-                    <Select value={currentMonth.getFullYear().toString()} onValueChange={(year) => {
-                      const newDate = new Date(currentMonth);
-                      newDate.setFullYear(parseInt(year));
-                      setCurrentMonth(newDate);
-                    }}>
-                      <SelectTrigger className="w-[100px] h-9 rounded-lg">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i).map(year => (
-                          <SelectItem key={year} value={year.toString()}>{year}\ub144</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={(currentMonth.getMonth() + 1).toString()} onValueChange={(month) => {
-                      const newDate = new Date(currentMonth);
-                      newDate.setMonth(parseInt(month) - 1);
-                      setCurrentMonth(newDate);
-                    }}>
-                      <SelectTrigger className="w-[90px] h-9 rounded-lg">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
-                          <SelectItem key={month} value={month.toString()}>{month}\uc6d4</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 rounded-lg"
+                      onClick={() => {
+                        const newDate = new Date(currentMonth);
+                        newDate.setMonth(newDate.getMonth() - 1);
+                        setCurrentMonth(newDate);
+                      }}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3 rounded-lg text-xs font-bold"
+                      onClick={() => {
+                        const today = new Date();
+                        setCurrentMonth(today);
+                      }}
+                    >
+                      오늘
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 rounded-lg"
+                      onClick={() => {
+                        const newDate = new Date(currentMonth);
+                        newDate.setMonth(newDate.getMonth() + 1);
+                        setCurrentMonth(newDate);
+                      }}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 rounded-lg"
-                    onClick={() => {
-                      const today = new Date();
-                      setCurrentMonth(today);
-                    }}
-                  >
-                    \uc624\ub298
-                  </Button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -646,19 +645,22 @@ export default function Home() {
                 </div>
                 {renderCalendar(true)}
               </div>
-            )}
+            )
+            }
 
-            {tab === 'artists' && (
-              <div className="space-y-4">
-                <Input placeholder="Search name..." value={artistSearch} onChange={e => setArtistSearch(e.target.value)} className="h-10 rounded-xl bg-slate-50 border-none" />
-                <div className="grid grid-cols-1 gap-3">
-                  {filteredArtists.map(a => <ArtistCard key={a.id} artist={a} onToggleFavorite={handleToggleFavorite} onEdit={handleEditArtist} onDelete={handleDeleteArtist} getGenreColor={(g) => getGenreStyles(g).bg} />)}
+            {
+              tab === 'artists' && (
+                <div className="space-y-4">
+                  <Input placeholder="Search name..." value={artistSearch} onChange={e => setArtistSearch(e.target.value)} className="h-10 rounded-xl bg-slate-50 border-none" />
+                  <div className="grid grid-cols-1 gap-3">
+                    {filteredArtists.map(a => <ArtistCard key={a.id} artist={a} onToggleFavorite={handleToggleFavorite} onEdit={handleEditArtist} onDelete={handleDeleteArtist} getGenreColor={(g) => getGenreStyles(g).bg} />)}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )
+            }
+          </div >
         )}
-      </main>
+      </main >
 
       <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
         <DialogContent className="max-w-[280px] rounded-3xl border-none p-6">
@@ -855,6 +857,6 @@ export default function Home() {
       </Dialog>
 
       <footer className="py-8 bg-slate-50/50"><div className="container text-center text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">Jak-Eun-Tta-Om-Pyo. Mobile Ready v2.0</div></footer>
-    </div>
+    </div >
   );
 }
