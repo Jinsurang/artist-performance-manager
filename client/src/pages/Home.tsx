@@ -17,15 +17,15 @@ import { Artist } from "@/types";
 const AVAILABLE_GENRES = ["어쿠스틱", "팝", "재즈", "포크", "인디", "락", "발라드", "브릿팝", "가요"];
 
 const GENRE_COLORS: Record<string, { bg: string, text: string, border: string }> = {
-  "어쿠스틱": { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
-  "팝": { bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200" },
-  "재즈": { bg: "bg-emerald-100", text: "text-emerald-800", border: "border-emerald-300" },
-  "포크": { bg: "bg-green-50", text: "text-green-700", border: "border-green-200" },
-  "인디": { bg: "bg-emerald-200", text: "text-emerald-900", border: "border-emerald-400" },
-  "락": { bg: "bg-slate-100", text: "text-slate-800", border: "border-slate-300" },
-  "발라드": { bg: "bg-stone-50", text: "text-stone-700", border: "border-stone-200" },
-  "브릿팝": { bg: "bg-emerald-500", text: "text-white", border: "border-emerald-600" },
-  "가요": { bg: "bg-green-100", text: "text-green-800", border: "border-green-300" },
+  "어쿠스틱": { bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-300" },
+  "팝": { bg: "bg-pink-100", text: "text-pink-700", border: "border-pink-300" },
+  "재즈": { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-300" },
+  "포크": { bg: "bg-purple-100", text: "text-purple-700", border: "border-purple-300" },
+  "인디": { bg: "bg-teal-100", text: "text-teal-700", border: "border-teal-300" },
+  "락": { bg: "bg-red-100", text: "text-red-700", border: "border-red-300" },
+  "발라드": { bg: "bg-rose-100", text: "text-rose-700", border: "border-rose-300" },
+  "브릿팝": { bg: "bg-indigo-100", text: "text-indigo-700", border: "border-indigo-300" },
+  "가요": { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-300" },
 };
 
 const INSTRUMENTS = ["보컬", "기타", "건반", "드럼", "바이올린", "첼로", "콘트라베이스", "관악기"];
@@ -306,6 +306,7 @@ export default function Home() {
           phone: artistForm.phone,
           instagram: artistForm.instagram,
           grade: artistForm.grade,
+          availableTime: artistForm.availableTime,
           instruments: instrumentsString,
           notes: artistForm.notes,
         });
@@ -831,36 +832,51 @@ export default function Home() {
           <DialogHeader><DialogTitle className="font-black text-lg">{editingArtist ? "정보 수정" : "아티스트 추가"}</DialogTitle></DialogHeader>
           <div className="space-y-5 pt-4">
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label className="text-[10px] font-black opacity-40">NAME</Label><Input className="h-10 rounded-xl bg-slate-50 border-none" value={artistForm.name} onChange={e => setArtistForm({ ...artistForm, name: e.target.value })} /></div>
-              <div className="space-y-1"><Label className="text-[10px] font-black opacity-40">PHONE</Label><Input className="h-10 rounded-xl bg-slate-50 border-none" value={artistForm.phone} onChange={e => setArtistForm({ ...artistForm, phone: e.target.value })} /></div>
+              <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600">이름</Label><Input className="h-10 rounded-xl bg-slate-50 border border-slate-200" value={artistForm.name} onChange={e => setArtistForm({ ...artistForm, name: e.target.value })} /></div>
+              <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600">연락처</Label><Input className="h-10 rounded-xl bg-slate-50 border border-slate-200" value={artistForm.phone} onChange={e => setArtistForm({ ...artistForm, phone: e.target.value })} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600">인스타그램 ID</Label><Input className="h-10 rounded-xl bg-slate-50 border border-slate-200" placeholder="@username" value={artistForm.instagram} onChange={e => setArtistForm({ ...artistForm, instagram: e.target.value })} /></div>
+              <div className="space-y-1">
+                <Label className="text-[11px] font-medium text-slate-600">등급</Label>
+                <Select value={artistForm.grade} onValueChange={(value) => setArtistForm({ ...artistForm, grade: value })}>
+                  <SelectTrigger className="h-10 rounded-xl bg-slate-50 border border-slate-200">
+                    <SelectValue placeholder="등급 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GRADE_OPTIONS.map(grade => (
+                      <SelectItem key={grade} value={grade}>{grade}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-1">
-              <Label className="text-[10px] font-black opacity-40">GRADE</Label>
-              <Select value={artistForm.grade} onValueChange={(value) => setArtistForm({ ...artistForm, grade: value })}>
-                <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-none">
-                  <SelectValue placeholder="등급 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {GRADE_OPTIONS.map(grade => (
-                    <SelectItem key={grade} value={grade}>{grade}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] font-black opacity-40">GENRES</Label>
+              <Label className="text-[11px] font-medium text-slate-600">장르</Label>
               <div className="flex flex-wrap gap-1.5">
                 {AVAILABLE_GENRES.map(g => {
                   const active = artistForm.genres.includes(g);
-                  return <button key={g} onClick={() => setArtistForm({ ...artistForm, genres: active ? artistForm.genres.filter(x => x !== g) : [...artistForm.genres, g] })} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${active ? 'bg-primary text-white border-primary' : 'bg-white text-slate-400 border-slate-100'}`}>{g}</button>
+                  const genreColors: Record<string, string> = {
+                    '어쿠스틱': 'bg-amber-500 border-amber-500',
+                    '팝': 'bg-pink-500 border-pink-500',
+                    '재즈': 'bg-blue-500 border-blue-500',
+                    '포크': 'bg-purple-500 border-purple-500',
+                    '인디': 'bg-teal-500 border-teal-500',
+                    '락': 'bg-red-500 border-red-500',
+                    '발라드': 'bg-rose-500 border-rose-500',
+                    '브루스': 'bg-indigo-500 border-indigo-500',
+                    '기타': 'bg-gray-500 border-gray-500'
+                  };
+                  const colorClass = active ? genreColors[g] || 'bg-primary border-primary' : 'bg-white border-slate-200';
+                  return <button key={g} onClick={() => setArtistForm({ ...artistForm, genres: active ? artistForm.genres.filter(x => x !== g) : [...artistForm.genres, g] })} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${colorClass} ${active ? 'text-white' : 'text-slate-400'}`}>{g}</button>
                 })}
               </div>
             </div>
             <div className="space-y-1">
-              <Label className="text-[10px] font-black opacity-40">INSTRUMENTS</Label>
+              <Label className="text-[11px] font-medium text-slate-600">악기</Label>
               <div className="grid grid-cols-3 gap-2">
                 {INSTRUMENTS.map(i => (
-                  <div key={i} className="flex flex-col items-center p-2 rounded-xl bg-slate-50">
+                  <div key={i} className="flex flex-col items-center p-2 rounded-xl bg-slate-50 border border-slate-200">
                     <span className="text-[8px] font-bold mb-1">{i}</span>
                     <div className="flex items-center gap-1.5">
                       <button onClick={() => setArtistForm({ ...artistForm, instruments: { ...artistForm.instruments, [i]: Math.max(0, (artistForm.instruments[i] || 0) - 1) } })} className="w-4 h-4 rounded bg-white border border-slate-200 text-[10px]">-</button>
@@ -871,8 +887,8 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <div className="space-y-1"><Label className="text-[10px] font-black opacity-40">NOTES</Label><Textarea className="rounded-xl bg-slate-50 border-none min-h-[100px]" value={artistForm.notes} onChange={e => setArtistForm({ ...artistForm, notes: e.target.value })} /></div>
-            <Button className="w-full h-12 rounded-2xl font-black text-sm" onClick={handleSaveArtistAdmin}>SAVE CHANGES</Button>
+            <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600">메모</Label><Textarea className="rounded-xl bg-slate-50 border border-slate-200 min-h-[100px]" value={artistForm.notes} onChange={e => setArtistForm({ ...artistForm, notes: e.target.value })} /></div>
+            <Button className="w-full h-12 rounded-2xl font-black text-sm" onClick={handleSaveArtistAdmin}>변경사항 저장</Button>
           </div>
         </DialogContent>
       </Dialog>

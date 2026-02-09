@@ -37,8 +37,8 @@ export function ArtistCard({
                     variant="ghost"
                     size="icon"
                     className={`h-9 w-9 rounded-xl transition-all ${artist.isFavorite
-                            ? "text-amber-400 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20"
-                            : "text-muted-foreground hover:text-amber-400 hover:bg-amber-50"
+                        ? "text-amber-400 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20"
+                        : "text-muted-foreground hover:text-amber-400 hover:bg-amber-50"
                         }`}
                     onClick={() => onToggleFavorite(artist)}
                 >
@@ -60,12 +60,25 @@ export function ArtistCard({
             <div className="mt-auto pt-4 border-t border-primary/5 flex items-center justify-between">
                 <div className="flex gap-1">
                     {artist.instagram && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-pink-500/70 hover:text-pink-500 hover:bg-pink-50">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-lg text-pink-500/70 hover:text-pink-500 hover:bg-pink-50"
+                            onClick={() => {
+                                const username = artist.instagram?.startsWith('@') ? artist.instagram.slice(1) : artist.instagram;
+                                window.open(`https://instagram.com/${username}`, '_blank');
+                            }}
+                        >
                             <Instagram className="h-4 w-4" />
                         </Button>
                     )}
                     {artist.phone && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-blue-500/70 hover:text-blue-500 hover:bg-blue-50">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-lg text-blue-500/70 hover:text-blue-500 hover:bg-blue-50"
+                            onClick={() => window.open(`tel:${artist.phone}`, '_self')}
+                        >
                             <Phone className="h-4 w-4" />
                         </Button>
                     )}
