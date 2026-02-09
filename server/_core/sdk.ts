@@ -262,60 +262,21 @@ class SDKServer {
     const cookieHeader = typeof reqOrCookie === 'string' ? reqOrCookie : (reqOrCookie as any)?.headers?.cookie;
     const runtimeEnv = getEnv(envOverride);
 
-    // Regular authentication flow
     const cookies = this.parseCookies(cookieHeader);
     const sessionCookie = cookies.get(COOKIE_NAME);
     const session = await this.verifySession(sessionCookie, envOverride);
 
     if (!session) {
       if (!runtimeEnv.oAuthServerUrl && (envOverride?.NODE_ENV === "development" || process.env.NODE_ENV === "development")) {
-        console.warn("[Auth] No session found on localhost. Using mock user for development.");
-        let mockUser = await db.getUserByOpenId("dev_user", dbInstance);
-        if (!mockUser) {
-          await db.upsertUser({
-            openId: "dev_user",
-            name: "개발자 (Dev User)",
-            email: "dev@example.com",
-            loginMethod: "localhost",
-            lastSignedIn: new Date(),
-          }, dbInstance);
-          mockUser = await db.getUserByOpenId("dev_user", dbInstance);
-        }
-        return mockUser!;
+        return (await db.getUserByOpenId("dev_user", dbInstance))!;
       }
       throw ForbiddenError("Invalid session cookie");
     }
 
-    const sessionUserId = session.openId;
-    const signedInAt = new Date();
-    let user = await db.getUserByOpenId(sessionUserId, dbInstance);
-
-    // If user not in DB, sync from OAuth server automatically
+    const user = await db.getUserByOpenId(session.openId, dbInstance);
     if (!user) {
-      try {
-        const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "", envOverride);
-        await db.upsertUser({
-          openId: userInfo.openId,
-          name: userInfo.name || null,
-          email: userInfo.email ?? null,
-          loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
-          lastSignedIn: signedInAt,
-        }, dbInstance);
-        user = await db.getUserByOpenId(userInfo.openId, dbInstance);
-      } catch (error) {
-        console.error("[Auth] Failed to sync user from OAuth:", error);
-        throw ForbiddenError("Failed to sync user info");
-      }
+      throw ForbiddenError("User not found in database. Please sign in again.");
     }
-
-    if (!user) {
-      throw ForbiddenError("User not found");
-    }
-
-    await db.upsertUser({
-      openId: user.openId,
-      lastSignedIn: signedInAt,
-    }, dbInstance);
 
     return user;
   }

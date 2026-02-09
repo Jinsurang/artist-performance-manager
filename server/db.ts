@@ -7,20 +7,22 @@ import { ENV } from './_core/env';
 // Safe access to process.env (may not exist in Cloudflare Workers)
 const safeProcessEnv = typeof process !== 'undefined' ? process.env : {};
 
+// Global singleton for the database connection
 let _db: ReturnType<typeof drizzle> | null = null;
 let _sql: ReturnType<typeof postgres> | null = null;
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb(databaseUrl?: string) {
   const url = databaseUrl || safeProcessEnv.DATABASE_URL;
+  if (!url) return null;
 
-  if (!_sql && url && typeof url === 'string') {
+  if (!_sql) {
     try {
-      // Use max_prepared: 0 for transaction poolers (Supabase port 6543)
       _sql = postgres(url, {
         ssl: 'require',
         max_prepared: 0,
         connect_timeout: 10,
+        // Cloudflare Workers work best with single connections per request
+        max: 1,
       } as any);
       _db = drizzle(_sql);
     } catch (error) {
@@ -110,40 +112,27 @@ export async function getUserByOpenId(openId: string, dbInstance?: any) {
 /**
  * Artist queries
  */
-export async function createArtist(data: any, dbInstance?: any) {
+export async function createArtist(data: any) {
   const sqlClient = await getRawSql();
   if (!sqlClient) throw new Error("데이터베이스 연결 실패");
 
-  try {
-    // We use raw SQL to be 100% sure about the column mapping 
-    // and to bypass any Drizzle identity column/returning issues in Cloudflare.
-    const name = data.name || "";
-    const genre = data.genre || "";
-    const phone = data.phone || null;
-    const instagram = data.instagram || null;
-    const grade = data.grade || null;
-    const available_time = data.availableTime || null;
-    const instruments = data.instruments || null;
-    const notes = data.notes || null;
+  // V2.4: Optimized for Cloudflare Workers (Minimal subrequests)
+  const result = await sqlClient`
+    INSERT INTO artists (name, genre, phone, instagram, grade, available_time, instruments, notes)
+    VALUES (
+      ${data.name || ""}, 
+      ${data.genre || ""}, 
+      ${data.phone || null}, 
+      ${data.instagram || null}, 
+      ${data.grade || null}, 
+      ${data.availableTime || null}, 
+      ${data.instruments || null}, 
+      ${data.notes || null}
+    )
+    RETURNING *
+  `;
 
-    console.log("[V2.3] Inserting artist with RAW sql client");
-
-    const result = await sqlClient`
-      INSERT INTO artists (name, genre, phone, instagram, grade, available_time, instruments, notes)
-      VALUES (${name}, ${genre}, ${phone}, ${instagram}, ${grade}, ${available_time}, ${instruments}, ${notes})
-      RETURNING *
-    `;
-
-    if (!result || result.length === 0) {
-      throw new Error("저장 후 데이터를 불러오지 못했습니다.");
-    }
-
-    return result[0];
-  } catch (error: any) {
-    console.error("[Database] createArtist V2.3 failed:", error);
-    // Be careful with error.message - it might contain the word "Failed query" which we saw in the screenshot
-    throw new Error(`저장 실패 (V2.3): ${error.message}${error.detail ? ` (${error.detail})` : ""}`);
-  }
+  return result[0];
 }
 
 export async function getArtists(search?: string, genre?: string, dbInstance?: any) {
