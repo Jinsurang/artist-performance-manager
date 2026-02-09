@@ -14,33 +14,26 @@ export const onRequest: any = async (context: any) => {
             req: request,
             router: appRouter,
             createContext: async () => {
+                const db = await getDb(env.DATABASE_URL);
+                let user = null;
                 try {
-                    const db = await getDb(env.DATABASE_URL);
-                    if (!db) {
-                        throw new Error("Cloudflare: Database not initialized");
-                    }
-
-                    let user = null;
-                    try {
-                        user = await sdk.authenticateRequest(request.headers.get('cookie') || undefined, db, env);
-                    } catch (e) {
-                        // Auth is optional
-                    }
-
-                    return {
-                        env,
-                        db,
-                        user,
-                    };
-                } catch (error: any) {
-                    console.error("[Worker Context Error]", error);
-                    return {
-                        env,
-                        db: null as any,
-                        user: null,
-                    };
+                    user = await sdk.authenticateRequest(request.headers.get('cookie') || undefined, db, env);
+                } catch (e) {
+                    // Auth is optional
                 }
+                return { env, db, user };
             },
+            onError: ({ path, error }) => {
+                console.error(`[tRPC Error] ${path}:`, error);
+            }
+        }).catch(err => {
+            console.error("[Worker Crash]", err);
+            return new Response(JSON.stringify({
+                error: { message: err.message, stack: err.stack }
+            }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
         });
     }
 

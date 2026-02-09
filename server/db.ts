@@ -105,10 +105,19 @@ export async function createArtist(data: InsertArtist, dbInstance?: any) {
   const db = dbInstance || await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Omit id if present to let the database handle it as an identity column
-  const { id, ...cleanData } = data as any;
+  // Explicitly map fields and handle undefined as null to avoid SQL param mismatch
+  const values: any = {
+    name: data.name,
+    genre: data.genre,
+    phone: data.phone ?? null,
+    instagram: data.instagram ?? null,
+    grade: data.grade ?? null,
+    availableTime: data.availableTime ?? null,
+    instruments: data.instruments ?? null,
+    notes: data.notes ?? null,
+  };
 
-  const [newArtist] = await db.insert(artists).values(cleanData).returning();
+  const [newArtist] = await db.insert(artists).values(values).returning();
   return newArtist;
 }
 
