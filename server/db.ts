@@ -8,27 +8,33 @@ import { ENV } from './_core/env';
 const safeProcessEnv = typeof process !== 'undefined' ? process.env : {};
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _sql: ReturnType<typeof postgres> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb(databaseUrl?: string) {
   const url = databaseUrl || safeProcessEnv.DATABASE_URL;
 
-  if (!_db && url && typeof url === 'string') {
+  if (!_sql && url && typeof url === 'string') {
     try {
       // Use max_prepared: 0 for transaction poolers (Supabase port 6543)
-      const client = postgres(url, {
+      _sql = postgres(url, {
         ssl: 'require',
         max_prepared: 0,
         connect_timeout: 10,
       } as any);
-      _db = drizzle(client);
+      _db = drizzle(_sql);
     } catch (error) {
       console.error("[Database] Connection failed:", error);
+      _sql = null;
       _db = null;
     }
   }
-
   return _db;
+}
+
+export async function getRawSql() {
+  if (!_sql) await getDb();
+  return _sql;
 }
 
 export async function upsertUser(user: InsertUser, dbInstance?: any): Promise<void> {
@@ -105,8 +111,8 @@ export async function getUserByOpenId(openId: string, dbInstance?: any) {
  * Artist queries
  */
 export async function createArtist(data: any, dbInstance?: any) {
-  const db = dbInstance || await getDb();
-  if (!db) throw new Error("데이터베이스 연결 실패");
+  const sqlClient = await getRawSql();
+  if (!sqlClient) throw new Error("데이터베이스 연결 실패");
 
   try {
     // We use raw SQL to be 100% sure about the column mapping 
@@ -120,13 +126,13 @@ export async function createArtist(data: any, dbInstance?: any) {
     const instruments = data.instruments || null;
     const notes = data.notes || null;
 
-    console.log("[V2.2] Inserting artist with manual params");
+    console.log("[V2.3] Inserting artist with RAW sql client");
 
-    const result = await db.execute(sql`
+    const result = await sqlClient`
       INSERT INTO artists (name, genre, phone, instagram, grade, available_time, instruments, notes)
       VALUES (${name}, ${genre}, ${phone}, ${instagram}, ${grade}, ${available_time}, ${instruments}, ${notes})
-      RETURNING id, name, genre, phone, instagram, grade, available_time, instruments, notes, is_favorite, created_at, updated_at
-    `);
+      RETURNING *
+    `;
 
     if (!result || result.length === 0) {
       throw new Error("저장 후 데이터를 불러오지 못했습니다.");
@@ -134,8 +140,9 @@ export async function createArtist(data: any, dbInstance?: any) {
 
     return result[0];
   } catch (error: any) {
-    console.error("[Database] createArtist V2.2 failed:", error);
-    throw new Error(`저장 실패 (V2.2): ${error.message}${error.detail ? ` (${error.detail})` : ""}`);
+    console.error("[Database] createArtist V2.3 failed:", error);
+    // Be careful with error.message - it might contain the word "Failed query" which we saw in the screenshot
+    throw new Error(`저장 실패 (V2.3): ${error.message}${error.detail ? ` (${error.detail})` : ""}`);
   }
 }
 
