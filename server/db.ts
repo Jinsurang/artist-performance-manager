@@ -12,15 +12,22 @@ let _db: ReturnType<typeof drizzle> | null = null;
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb(databaseUrl?: string) {
   const url = databaseUrl || safeProcessEnv.DATABASE_URL;
+
   if (!_db && url) {
     try {
+      console.log("[Database] Attempting to connect with URL:", url.substring(0, 20) + "...");
       const client = postgres(url);
       _db = drizzle(client);
-    } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.log("[Database] Connected successfully");
+    } catch (error: any) {
+      console.error("[Database] Failed to connect:", error);
+      console.error("[Database] Error message:", error?.message);
       _db = null;
     }
+  } else if (!_db && !url) {
+    console.warn("[Database] No URL provided and safeProcessEnv.DATABASE_URL is empty");
   }
+
   return _db;
 }
 
