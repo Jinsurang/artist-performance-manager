@@ -15,7 +15,12 @@ export async function getDb(databaseUrl?: string) {
 
   if (!_db && url && typeof url === 'string') {
     try {
-      const client = postgres(url, { ssl: 'require' });
+      // Use max_prepared: 0 for transaction poolers (Supabase port 6543)
+      const client = postgres(url, {
+        ssl: 'require',
+        max_prepared: 0,
+        connect_timeout: 10,
+      } as any);
       _db = drizzle(client);
     } catch (error) {
       console.error("[Database] Connection failed:", error);

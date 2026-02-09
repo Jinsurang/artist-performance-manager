@@ -25,11 +25,19 @@ export const onRequest: any = async (context: any) => {
             },
             onError: ({ path, error }) => {
                 console.error(`[tRPC Error] ${path}:`, error);
+                // The error might contain 'originalError' which is the PG error
+                if (error.cause) {
+                    console.error("[Original Error]", error.cause);
+                }
             }
         }).catch(err => {
             console.error("[Worker Crash]", err);
             return new Response(JSON.stringify({
-                error: { message: err.message, stack: err.stack }
+                error: {
+                    message: err.message,
+                    stack: err.stack,
+                    detail: err.detail || err.hint || (err as any).originalError?.message
+                }
             }), {
                 status: 500,
                 headers: { "Content-Type": "application/json" }
