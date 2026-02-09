@@ -104,7 +104,11 @@ export async function getUserByOpenId(openId: string, dbInstance?: any) {
 export async function createArtist(data: InsertArtist, dbInstance?: any) {
   const db = dbInstance || await getDb();
   if (!db) throw new Error("Database not available");
-  const [newArtist] = await db.insert(artists).values(data).returning();
+
+  // Omit id if present to let the database handle it as an identity column
+  const { id, ...cleanData } = data as any;
+
+  const [newArtist] = await db.insert(artists).values(cleanData).returning();
   return newArtist;
 }
 
