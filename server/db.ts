@@ -4,11 +4,14 @@ import postgres from "postgres";
 import { InsertUser, users, artists, performances, notices, InsertArtist, InsertPerformance, InsertNotice } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
+// Safe access to process.env (may not exist in Cloudflare Workers)
+const safeProcessEnv = typeof process !== 'undefined' ? process.env : {};
+
 let _db: ReturnType<typeof drizzle> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb(databaseUrl?: string) {
-  const url = databaseUrl || process.env.DATABASE_URL;
+  const url = databaseUrl || safeProcessEnv.DATABASE_URL;
   if (!_db && url) {
     try {
       const client = postgres(url);
