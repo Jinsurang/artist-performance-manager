@@ -1241,7 +1241,7 @@ export default function Home() {
                             size="icon"
                             className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl"
                             onClick={async () => {
-                              if (confirm("공연을 확정하시겠습니까? (다른 요청들은 삭제됩니다)")) {
+                              if (confirm("공연을 확정하시겠습니까?")) {
                                 try {
                                   await confirmPerformance.mutateAsync({ id: p.id });
                                   toast.success("공연이 확정되었습니다.");
