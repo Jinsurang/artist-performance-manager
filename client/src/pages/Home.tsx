@@ -29,7 +29,7 @@ const GENRE_COLORS: Record<string, { bg: string, text: string, border: string }>
   "가요": { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-300" },
 };
 
-const INSTRUMENTS = ["보컬", "기타", "건반", "드럼", "바이올린", "첼로", "콘트라베이스", "관악기"];
+const INSTRUMENTS = ["보컬", "기타", "피아노", "드럼", "바이올린", "첼로", "베이스", "관악기"];
 const GRADE_OPTIONS = ["S", "A", "B", "C"];
 
 const parseInstruments = (instrumentsStr: string | null): Record<string, number> => {
@@ -738,7 +738,7 @@ export default function Home() {
           <div className="space-y-6">
             <div className="flex p-1 bg-slate-100 rounded-xl">
               {["dashboard", "artists"].map(t => (
-                <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2 text-[10px] font-black transition-all rounded-lg ${tab === t ? 'bg-white text-primary shadow-sm' : 'text-slate-400'}`}>
+                <button key={t} onClick={() => setTab(t)} className={`flex-1 py-3.5 text-xs font-black transition-all rounded-lg ${tab === t ? 'bg-white text-primary shadow-sm' : 'text-slate-400'}`}>
                   {t === 'dashboard' ? '일정관리' : `아티스트${artists ? `(${artists.length})` : ''}`}
                 </button>
               ))}
