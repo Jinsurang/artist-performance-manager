@@ -857,7 +857,7 @@ export default function Home() {
                         )}
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 sm:gap-4 px-1">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-1">
                       {filteredArtists.map(a => <ArtistCard key={a.id} artist={a} onToggleFavorite={handleToggleFavorite} onEdit={handleEditArtist} onDelete={handleDeleteArtist} getGenreColor={(g) => getGenreStyles(g).bg} />)}
                     </div>
                   </div>
