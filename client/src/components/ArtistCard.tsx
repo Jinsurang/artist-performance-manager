@@ -78,11 +78,11 @@ export function ArtistCard({
             <div className="space-y-6">
                 {/* Instruments */}
                 <div className="space-y-3">
-                    <span className="text-[11px] font-black text-[#2D6A4F] uppercase tracking-wider">악기구성</span>
+                    <span className="text-[11px] font-black text-[#2D6A4F] uppercase tracking-wider">인원 및 악기구성</span>
                     <div className="flex items-center gap-3 bg-[#E8F3F1] p-4 rounded-2xl border border-[#A8C3C3]/20">
                         <Music className="h-5 w-5 text-[#2D6A4F]/60 flex-shrink-0" />
                         <span className="font-bold text-[#1B4332] text-[13px] sm:text-sm leading-tight">
-                            {artist.instruments || "악기 미등록"}
+                            {artist.memberCount}명 - {artist.instruments || "악기 미등록"}
                         </span>
                     </div>
                 </div>

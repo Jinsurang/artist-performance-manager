@@ -9,6 +9,7 @@ export interface Artist {
     availableTime: string;
     preferredDays: string | null;
     instruments: string | null;
+    memberCount: number;
     notes?: string | null;
     isFavorite: boolean;
     createdAt: string;

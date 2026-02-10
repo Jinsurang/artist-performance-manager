@@ -135,6 +135,7 @@ export default function Home() {
     availableTime: "",
     preferredDays: [] as string[],
     instruments: {} as Record<string, number>,
+    memberCount: 1,
     notes: "",
   });
 
@@ -364,6 +365,7 @@ export default function Home() {
       availableTime: artist.availableTime || "",
       preferredDays: typeof artist.preferredDays === 'string' ? artist.preferredDays.split(',').filter(Boolean) : [],
       instruments: {},
+      memberCount: artist.memberCount || 1,
       notes: artist.notes || "",
     });
     setIsArtistOpen(true);
@@ -413,6 +415,7 @@ export default function Home() {
         availableTime: artistForm.availableTime,
         preferredDays: artistForm.preferredDays.join(","),
         instruments: instrumentsString,
+        memberCount: artistForm.memberCount,
         notes: artistForm.notes,
       };
       console.log('[V3.0] Saving artist (Render Ready):', inputData);
@@ -428,6 +431,7 @@ export default function Home() {
           availableTime: artistForm.availableTime,
           preferredDays: artistForm.preferredDays.join(","),
           instruments: instrumentsString,
+          memberCount: artistForm.memberCount,
           notes: artistForm.notes,
         });
         toast.success("수정 완료");
@@ -441,6 +445,7 @@ export default function Home() {
           availableTime: artistForm.availableTime,
           preferredDays: artistForm.preferredDays.join(","),
           instruments: instrumentsString,
+          memberCount: artistForm.memberCount,
           notes: artistForm.notes,
         });
         toast.success("등록 완료");
@@ -812,6 +817,7 @@ export default function Home() {
                               availableTime: "",
                               preferredDays: [],
                               instruments: {},
+                              memberCount: 1,
                               notes: ""
                             });
                             setIsArtistOpen(true);
@@ -1290,6 +1296,21 @@ export default function Home() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] font-medium text-slate-600">인원</Label>
+                <div className="flex items-center gap-3 h-10 px-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <button
+                    onClick={() => setArtistForm({ ...artistForm, memberCount: Math.max(1, artistForm.memberCount - 1) })}
+                    className="w-6 h-6 rounded-lg bg-white border border-slate-200 text-xs font-bold hover:bg-slate-100 transition-colors flex items-center justify-center"
+                  >-</button>
+                  <span className="text-xs font-black min-w-[2ch] text-center">{artistForm.memberCount}</span>
+                  <button
+                    onClick={() => setArtistForm({ ...artistForm, memberCount: artistForm.memberCount + 1 })}
+                    className="w-6 h-6 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary/90 shadow-md shadow-primary/20 transition-all flex items-center justify-center"
+                  >+</button>
+                  <span className="text-[10px] font-bold text-slate-400 ml-1">명</span>
+                </div>
+              </div>
             </div>
             <div className="space-y-1">
               <Label className="text-[11px] font-medium text-slate-600">장르</Label>
@@ -1344,7 +1365,7 @@ export default function Home() {
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-[11px] font-medium text-slate-600">악기</Label>
+              <Label className="text-[11px] font-medium text-slate-600">인원 및 악기구성</Label>
               <div className="grid grid-cols-2 gap-2">
                 {INSTRUMENTS.map(i => (
                   <div key={i} className="flex flex-col items-center p-3 rounded-2xl bg-white border border-slate-100 shadow-sm transition-all hover:border-primary/20">
