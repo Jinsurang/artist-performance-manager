@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and, gte, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { InsertUser, users, artists, performances, notices, InsertArtist, InsertPerformance, InsertNotice, settings } from "../drizzle/schema";
@@ -259,7 +259,7 @@ export async function getMonthlyPerformances(year: number, month: number, dbInst
   const db = dbInstance || await getDb();
   if (!db) return [];
 
-  const startDate = new Date(year, month - 1, 1);
+  const startDate = new Date(year, month - 1, 1, 0, 0, 0);
   const endDate = new Date(year, month, 0, 23, 59, 59);
 
   return await db.select({
@@ -276,7 +276,10 @@ export async function getMonthlyPerformances(year: number, month: number, dbInst
   })
     .from(performances)
     .leftJoin(artists, eq(performances.artistId, artists.id))
-    .where(sql`performances.performance_date BETWEEN ${startDate} AND ${endDate}`)
+    .where(and(
+      gte(performances.performanceDate, startDate),
+      lte(performances.performanceDate, endDate)
+    ))
     .orderBy(performances.performanceDate);
 }
 

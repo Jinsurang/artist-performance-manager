@@ -149,9 +149,7 @@ export default function Home() {
   today.setHours(0, 0, 0, 0);
 
   // Queries
-  const { data: artists, refetch: refetchArtists } = trpc.artist.list.useQuery({
-    genre: selectedGenre || undefined,
-  }, { enabled: isAdmin });
+  const { data: artists, refetch: refetchArtists } = trpc.artist.list.useQuery({}, { enabled: isAdmin });
 
   const { data: monthlyPerfs, refetch: refetchMonthlyPerfs } = trpc.performance.getMonthly.useQuery({
     year: currentMonth.getFullYear(),
@@ -726,32 +724,6 @@ export default function Home() {
                   </div>
                 </div>
 
-                {latestNotice && (
-                  <Card className="shadow-sm border-slate-200 rounded-2xl overflow-hidden bg-white mb-6">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <Bell className="h-4 w-4 text-slate-500" />
-                        최근 공지
-                      </CardTitle>
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
-                          setEditingNotice(latestNotice);
-                          setNoticeForm({ title: latestNotice.title, content: latestNotice.content });
-                          setIsNoticeOpen(true);
-                        }}>
-                          <Edit2 className="h-3 w-3 text-slate-400" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteNotice(latestNotice.id)}>
-                          <Trash2 className="h-3 w-3 text-slate-400" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <h4 className="font-bold text-slate-900 mb-1">{latestNotice.title}</h4>
-                      <p className="text-xs text-slate-600 whitespace-pre-wrap">{latestNotice.content}</p>
-                    </CardContent>
-                  </Card>
-                )}
                 <div className="grid grid-cols-2 gap-3">
                   <Card className="p-4 rounded-2xl border-none bg-blue-50/50">
                     <p className="text-[9px] font-black text-blue-400 uppercase">예정된 공연</p>
@@ -829,8 +801,8 @@ export default function Home() {
                               );
                             }}
                             className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${selectedGenres.includes(g)
-                                ? getGenreStyles(g).bg + ' ring-1 ring-offset-1 ' + getGenreStyles(g).bg.replace('bg-', 'ring-')
-                                : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'
+                              ? getGenreStyles(g).bg + ' ring-1 ring-offset-1 ' + getGenreStyles(g).bg.replace('bg-', 'ring-')
+                              : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'
                               }`}
                           >
                             {g}
@@ -945,40 +917,85 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      {/* Notification Dialog */}
+      {/* Notification Dialog (Management Popup) */}
       <Dialog open={isNoticeOpen} onOpenChange={setIsNoticeOpen}>
-        <DialogContent className="max-w-md rounded-3xl p-6 border-none">
+        <DialogContent className="max-w-md rounded-3xl p-6 border-none overflow-hidden flex flex-col max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle className="font-black text-lg flex items-center gap-2">
-              <Bell className="h-5 w-5 text-primary" />
-              {editingNotice ? "공지 수정" : "공지 작성"}
+            <DialogTitle className="font-black text-lg flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bell className="h-5 w-5 text-primary" />
+                공지사항 관리
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-lg text-[10px] font-bold"
+                onClick={() => {
+                  setEditingNotice(null);
+                  setNoticeForm({ title: "", content: "" });
+                }}
+              >
+                + 새 공지
+              </Button>
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <div className="space-y-1">
-              <Label className="text-[10px] font-black opacity-40">TITLE</Label>
-              <Input
-                className="h-10 rounded-xl bg-slate-50 border-none"
-                placeholder="공지 제목"
-                value={noticeForm.title}
-                onChange={e => setNoticeForm({ ...noticeForm, title: e.target.value })}
-              />
+
+          <div className="flex-1 overflow-y-auto space-y-4 pt-4 pr-1">
+            {/* Form Section */}
+            <Card className="border-primary/10 shadow-none bg-slate-50/50 rounded-2xl">
+              <CardContent className="p-4 space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-[9px] font-black opacity-40 uppercase">TITLE</Label>
+                  <Input
+                    className="h-10 rounded-xl bg-white border-slate-200"
+                    placeholder="공지 제목"
+                    value={noticeForm.title}
+                    onChange={e => setNoticeForm({ ...noticeForm, title: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] font-black opacity-40 uppercase">CONTENT</Label>
+                  <Textarea
+                    className="rounded-xl bg-white border-slate-200 min-h-[100px]"
+                    placeholder="공지 내용"
+                    value={noticeForm.content}
+                    onChange={e => setNoticeForm({ ...noticeForm, content: e.target.value })}
+                  />
+                </div>
+                <Button
+                  className="w-full h-11 rounded-xl font-black text-xs"
+                  onClick={handleCreateNotice}
+                >
+                  {editingNotice ? "수정 완료" : "공지 등록"}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* List Section */}
+            <div className="space-y-2">
+              <Label className="text-[9px] font-black opacity-40 uppercase pl-1">EXISTING NOTICES</Label>
+              <div className="space-y-2">
+                {trpc.notice.list.useQuery().data?.map((n: any) => (
+                  <div key={n.id} className="p-3 bg-white border border-slate-100 rounded-2xl flex items-start justify-between gap-3 group">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-xs text-slate-900 truncate">{n.title}</h4>
+                      <p className="text-[10px] text-slate-500 line-clamp-1">{n.content}</p>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                        setEditingNotice(n);
+                        setNoticeForm({ title: n.title, content: n.content });
+                      }}>
+                        <Edit2 className="h-3 w-3 text-slate-400" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-red-600" onClick={() => handleDeleteNotice(n.id)}>
+                        <Trash2 className="h-3 w-3 text-slate-400" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] font-black opacity-40">CONTENT</Label>
-              <Textarea
-                className="rounded-xl bg-slate-50 border-none min-h-[150px]"
-                placeholder="공지 내용"
-                value={noticeForm.content}
-                onChange={e => setNoticeForm({ ...noticeForm, content: e.target.value })}
-              />
-            </div>
-            <Button
-              className="w-full h-12 rounded-2xl font-black text-sm"
-              onClick={handleCreateNotice}
-            >
-              {editingNotice ? "수정 완료" : "공지 등록"}
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
