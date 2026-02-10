@@ -1245,6 +1245,14 @@ export default function Home() {
                             </a>
                           )}
                         </div>
+                        {p.notes && p.notes !== "사용자 직접 신청" && (
+                          <div className="mt-3 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100/50">
+                            <p className="text-[11px] text-indigo-700 font-medium leading-relaxed italic">
+                              <span className="font-bold not-italic mr-1">📝 요청사항:</span>
+                              "{p.notes}"
+                            </p>
+                          </div>
+                        )}
                       </div>
                       <div className="flex gap-1">
                         {p.status === 'pending' && (
