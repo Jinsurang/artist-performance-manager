@@ -678,8 +678,8 @@ export default function Home() {
             {/* Performance Selection */}
             <div className={`space-y-4 transition-all duration-700 ${!isProfileSaved ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
               <div className="flex items-center justify-between px-2">
-                <div className="flex flex-col sm:flex-row sm:items-baseline gap-x-2">
-                  <h3 className="text-lg font-black tracking-tighter">공연 신청 날짜 선택</h3>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-black tracking-tighter leading-none">공연 신청 날짜 선택</h3>
                   <p className="text-[10px] text-slate-400 font-normal leading-tight">
                     원하시는 날짜를 클릭하여 선택해주세요. 선택 후 하단 버튼을 눌러 일괄 신청할 수 있습니다.
                   </p>
