@@ -1,4 +1,4 @@
-import { eq, sql, and, gte, lte } from "drizzle-orm";
+import { eq, sql, and, gte, lte, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { InsertUser, users, artists, performances, notices, InsertArtist, InsertPerformance, InsertNotice, settings } from "../drizzle/schema";
@@ -119,7 +119,7 @@ export async function createArtist(data: any, dbInstance?: any) {
 
   // V3.0: Standard SQL insert for Node.js (Render)
   const result = await sqlClient`
-    INSERT INTO artists (name, genre, phone, instagram, grade, available_time, preferred_days, instruments, notes)
+    INSERT INTO artists (name, genre, phone, instagram, grade, available_time, preferred_days, instruments, member_count, notes)
     VALUES (
       ${data.name || ""}, 
       ${data.genre || ""}, 
@@ -129,6 +129,7 @@ export async function createArtist(data: any, dbInstance?: any) {
       ${data.availableTime || null}, 
       ${data.preferredDays || null}, 
       ${data.instruments || null}, 
+      ${data.memberCount || 1},
       ${data.notes || null}
     )
     RETURNING *
@@ -148,6 +149,7 @@ export async function createArtist(data: any, dbInstance?: any) {
     availableTime: row.available_time,
     preferredDays: row.preferred_days,
     instruments: row.instruments,
+    memberCount: row.member_count,
     notes: row.notes,
     isFavorite: row.is_favorite,
     createdAt: row.created_at,
@@ -179,6 +181,7 @@ export async function searchPublicArtists(name: string, dbInstance?: any) {
     id: artists.id,
     name: artists.name,
     instruments: artists.instruments,
+    memberCount: artists.memberCount,
   })
     .from(artists)
     .where(sql`artists.name ILIKE ${`%${name}%`}`)
@@ -248,6 +251,25 @@ export async function deletePerformance(id: number, dbInstance?: any) {
   return await db.delete(performances).where(eq(performances.id, id));
 }
 
+export async function deleteOtherDailyPendings(performanceId: number, performanceDate: Date, dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const start = new Date(performanceDate);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(performanceDate);
+  end.setHours(23, 59, 59, 999);
+
+  return await db.delete(performances).where(
+    and(
+      ne(performances.id, performanceId),
+      eq(performances.status, 'pending'),
+      gte(performances.performanceDate, start),
+      lte(performances.performanceDate, end)
+    )
+  );
+}
+
 export async function getArtistStats(artistId: number, dbInstance?: any) {
   const db = dbInstance || await getDb();
   if (!db) return { totalPerformances: 0, completedPerformances: 0, upcomingPerformances: 0 };
@@ -294,6 +316,7 @@ export async function getMonthlyPerformances(year: number, month: number, dbInst
     artistGenre: artists.genre,
     artistPhone: artists.phone,
     artistInstagram: artists.instagram,
+    artistMemberCount: artists.memberCount,
   })
     .from(performances)
     .leftJoin(artists, eq(performances.artistId, artists.id))

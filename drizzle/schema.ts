@@ -33,6 +33,7 @@ export const artists = pgTable("artists", {
   availableTime: varchar("available_time", { length: 255 }),
   preferredDays: varchar("preferred_days", { length: 255 }),
   instruments: varchar("instruments", { length: 255 }),
+  memberCount: integer("member_count").default(1).notNull(),
   notes: text("notes"),
   isFavorite: boolean("is_favorite").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -16,6 +16,7 @@ import {
   getPerformanceById,
   updatePerformance,
   deletePerformance,
+  deleteOtherDailyPendings,
   getWeeklyPerformances,
   getMonthlyPerformances,
   createNotice,
@@ -108,6 +109,7 @@ export const appRouter = router({
           availableTime: z.string().optional(),
           preferredDays: z.string().optional(),
           instruments: z.string().optional(),
+          memberCount: z.number().default(1),
           notes: z.string().optional(),
         })
       )
@@ -136,6 +138,7 @@ export const appRouter = router({
           availableTime: z.string().optional(),
           preferredDays: z.string().optional(),
           instruments: z.string().optional(),
+          memberCount: z.number().optional(),
           isFavorite: z.boolean().optional(),
           notes: z.string().optional(),
         })
@@ -215,6 +218,20 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
         return await deletePerformance(input.id, ctx.db);
+      }),
+    confirm: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const perf = await getPerformanceById(input.id, ctx.db);
+        if (!perf) throw new TRPCError({ code: "NOT_FOUND" });
+
+        // 1. Confirm this one
+        await updatePerformance(input.id, { status: "confirmed" }, ctx.db);
+
+        // 2. Delete others
+        await deleteOtherDailyPendings(input.id, perf.performanceDate, ctx.db);
+
+        return { success: true };
       }),
     getWeekly: protectedProcedure.query(async ({ ctx }) => {
       return await getWeeklyPerformances(ctx.db);
