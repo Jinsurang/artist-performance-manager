@@ -134,7 +134,25 @@ export async function createArtist(data: any, dbInstance?: any) {
     RETURNING *
   `;
 
-  return result[0];
+  if (!result[0]) return null;
+  const row = result[0];
+
+  // Return camelCase to match Drizzle/Frontend expectations
+  return {
+    id: row.id,
+    name: row.name,
+    genre: row.genre,
+    phone: row.phone,
+    instagram: row.instagram,
+    grade: row.grade,
+    availableTime: row.available_time,
+    preferredDays: row.preferred_days,
+    instruments: row.instruments,
+    notes: row.notes,
+    isFavorite: row.is_favorite,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
 }
 
 export async function getArtists(search?: string, genre?: string, dbInstance?: any) {

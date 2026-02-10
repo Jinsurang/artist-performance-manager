@@ -16,21 +16,23 @@ export function ArtistCard({
                 <div className="space-y-1.5 flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                         <h4 className="font-bold text-lg text-foreground group-hover:text-primary transition-colors truncate">
-                            {artist.name}
+                            {artist.name || "이름 없음"}
                         </h4>
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/20 text-primary">
                             {artist.grade || "C"}
                         </Badge>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                        {artist.genres.map((g) => (
+                        {artist.genres && artist.genres.length > 0 ? artist.genres.map((g) => (
                             <span
                                 key={g}
                                 className={`text-[10px] px-2 py-0.5 rounded-full font-medium border shadow-sm ${getGenreColor(g)}`}
                             >
                                 {g}
                             </span>
-                        ))}
+                        )) : (
+                            <span className="text-[10px] text-slate-400 italic">장르 미등록</span>
+                        )}
                     </div>
                 </div>
                 <Button

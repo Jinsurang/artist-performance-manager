@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,17 @@ const GENRE_COLORS: Record<string, { bg: string, text: string, border: string }>
 
 const INSTRUMENTS = ["보컬", "기타", "건반", "드럼", "바이올린", "첼로", "콘트라베이스", "관악기"];
 const GRADE_OPTIONS = ["S", "A", "B", "C"];
+
+const formatPhoneNumber = (value: string) => {
+  if (!value) return value;
+  const phoneNumber = value.replace(/[^\d]/g, '');
+  const phoneNumberLength = phoneNumber.length;
+  if (phoneNumberLength < 4) return phoneNumber;
+  if (phoneNumberLength < 8) {
+    return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(3)}`;
+  }
+  return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(3, 7)}-${phoneNumber.slice(7, 11)}`;
+};
 const WEEK_DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
 function SearchResults({ query, onSelect }: { query: string; onSelect: (artist: { id: number, name: string, instruments: string | null }) => void }) {
@@ -162,10 +174,30 @@ export default function Home() {
   const upcomingMonthlyPerfs = monthlyPerfs?.filter((p: any) => new Date(p.performanceDate) >= today) || [];
 
   // Mutations
+  const queryClient = useQueryClient();
   const createArtist = trpc.artist.create.useMutation();
   const updateArtist = trpc.artist.update.useMutation();
   const deleteArtist = trpc.artist.delete.useMutation();
-  const toggleFavorite = trpc.artist.update.useMutation();
+  const toggleFavorite = trpc.artist.update.useMutation({
+    onMutate: async ({ id, isFavorite }) => {
+      await queryClient.cancelQueries({ queryKey: [['artist', 'list']] });
+      const previousArtists = queryClient.getQueryData([['artist', 'list'], { type: 'query' }]);
+      queryClient.setQueryData([['artist', 'list'], { type: 'query' }], (old: any) => {
+        if (!old) return old;
+        return old.map((a: any) => a.id === id ? { ...a, isFavorite } : a);
+      });
+      return { previousArtists };
+    },
+    onError: (err, variables, context: any) => {
+      if (context?.previousArtists) {
+        queryClient.setQueryData([['artist', 'list'], { type: 'query' }], context.previousArtists);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: [['artist', 'list']] });
+    }
+  });
+
   const createPerformance = trpc.performance.create.useMutation();
   const updatePerformance = trpc.performance.update.useMutation();
   const createPending = trpc.performance.createPending.useMutation();
@@ -341,7 +373,6 @@ export default function Home() {
         id: artist.id,
         isFavorite: !artist.isFavorite,
       });
-      refetchArtists();
     } catch (error) {
       toast.error("즐겨찾기 변경 실패");
     }
@@ -365,9 +396,9 @@ export default function Home() {
       return;
     }
 
-    const instrumentsString = Object.entries(artistForm.instruments)
-      .filter(([_, count]) => count > 0)
-      .map(([name, count]) => `${name}(${count})`)
+    const instrumentsString = INSTRUMENTS
+      .filter(name => (artistForm.instruments[name] || 0) > 0)
+      .map(name => `${name}(${artistForm.instruments[name]})`)
       .join(", ");
 
     try {
@@ -831,7 +862,7 @@ export default function Home() {
                         )}
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {filteredArtists.map(a => <ArtistCard key={a.id} artist={a} onToggleFavorite={handleToggleFavorite} onEdit={handleEditArtist} onDelete={handleDeleteArtist} getGenreColor={(g) => getGenreStyles(g).bg} />)}
                     </div>
                   </div>
@@ -1215,10 +1246,29 @@ export default function Home() {
           <div className="space-y-5 pt-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600">이름</Label><Input className="h-10 rounded-xl bg-slate-50 border border-slate-200" value={artistForm.name} onChange={e => setArtistForm({ ...artistForm, name: e.target.value })} /></div>
-              <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600">연락처</Label><Input className="h-10 rounded-xl bg-slate-50 border border-slate-200" value={artistForm.phone} onChange={e => setArtistForm({ ...artistForm, phone: e.target.value })} /></div>
+              <div className="space-y-1">
+                <Label className="text-[11px] font-medium text-slate-600">연락처</Label>
+                <Input
+                  className="h-10 rounded-xl bg-slate-50 border border-slate-200"
+                  placeholder="010-0000-0000"
+                  value={artistForm.phone}
+                  onChange={e => setArtistForm({ ...artistForm, phone: formatPhoneNumber(e.target.value) })}
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600">인스타그램 ID</Label><Input className="h-10 rounded-xl bg-slate-50 border border-slate-200" placeholder="@username" value={artistForm.instagram} onChange={e => setArtistForm({ ...artistForm, instagram: e.target.value })} /></div>
+              <div className="space-y-1">
+                <Label className="text-[11px] font-medium text-slate-600">인스타그램 ID</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">@</span>
+                  <Input
+                    className="h-10 pl-7 rounded-xl bg-slate-50 border border-slate-200"
+                    placeholder="username"
+                    value={artistForm.instagram.replace(/^@/, '')}
+                    onChange={e => setArtistForm({ ...artistForm, instagram: e.target.value.replace(/^@/, '') })}
+                  />
+                </div>
+              </div>
               <div className="space-y-1">
                 <Label className="text-[11px] font-medium text-slate-600">등급</Label>
                 <Select value={artistForm.grade} onValueChange={(value) => setArtistForm({ ...artistForm, grade: value })}>
@@ -1287,14 +1337,20 @@ export default function Home() {
             </div>
             <div className="space-y-1">
               <Label className="text-[11px] font-medium text-slate-600">악기</Label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {INSTRUMENTS.map(i => (
-                  <div key={i} className="flex flex-col items-center p-2 rounded-xl bg-slate-50 border border-slate-200">
-                    <span className="text-[8px] font-bold mb-1">{i}</span>
-                    <div className="flex items-center gap-1.5">
-                      <button onClick={() => setArtistForm({ ...artistForm, instruments: { ...artistForm.instruments, [i]: Math.max(0, (artistForm.instruments[i] || 0) - 1) } })} className="w-4 h-4 rounded bg-white border border-slate-200 text-[10px]">-</button>
-                      <span className="text-[10px] font-bold">{artistForm.instruments[i] || 0}</span>
-                      <button onClick={() => setArtistForm({ ...artistForm, instruments: { ...artistForm.instruments, [i]: (artistForm.instruments[i] || 0) + 1 } })} className="w-4 h-4 rounded bg-primary text-white text-[10px]">+</button>
+                  <div key={i} className="flex flex-col items-center p-3 rounded-2xl bg-white border border-slate-100 shadow-sm transition-all hover:border-primary/20">
+                    <span className="text-[10px] font-black text-slate-400 mb-2 uppercase tracking-tighter">{i}</span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setArtistForm({ ...artistForm, instruments: { ...artistForm.instruments, [i]: Math.max(0, (artistForm.instruments[i] || 0) - 1) } })}
+                        className="w-6 h-6 rounded-lg bg-slate-50 border border-slate-200 text-xs font-bold hover:bg-slate-100 transition-colors flex items-center justify-center"
+                      >-</button>
+                      <span className="text-xs font-black min-w-[1ch] text-center">{artistForm.instruments[i] || 0}</span>
+                      <button
+                        onClick={() => setArtistForm({ ...artistForm, instruments: { ...artistForm.instruments, [i]: (artistForm.instruments[i] || 0) + 1 } })}
+                        className="w-6 h-6 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary/90 shadow-md shadow-primary/20 transition-all flex items-center justify-center"
+                      >+</button>
                     </div>
                   </div>
                 ))}
