@@ -217,7 +217,8 @@ export default function Home() {
   const createPerformance = trpc.performance.create.useMutation();
   const updatePerformance = trpc.performance.update.useMutation();
   const createPending = trpc.performance.createPending.useMutation();
-  const deletePerformance = trpc.performance.delete.useMutation();
+  const deletePerformance = trpc.performance.delete.useMutation({ onSuccess: () => refetchMonthlyPerfs() });
+  const confirmPerformance = trpc.performance.confirm.useMutation({ onSuccess: () => refetchMonthlyPerfs() });
   const createNotice = trpc.notice.create.useMutation();
   const updateNotice = trpc.notice.update.useMutation();
   const deleteNotice = trpc.notice.delete.useMutation();
@@ -341,6 +342,10 @@ export default function Home() {
       if (successful > 0) {
         toast.success(`${successful}건의 공연 신청이 성공적으로 접수되었습니다!`);
         setSelectedDates([]); // Reset selection
+        setIsProfileSaved(false);
+        setSavedArtistId(null);
+        setArtistForm({ ...artistForm, name: "" });
+        setSelectedArtistInstruments("");
         refetchMonthlyPerfs();
       }
 
