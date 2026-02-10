@@ -102,12 +102,14 @@ export const appRouter = router({
           instagram: z.string().optional(),
           grade: z.string().optional(),
           availableTime: z.string().optional(),
+          preferredDays: z.string().optional(),
           instruments: z.string().optional(),
           notes: z.string().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
-        return await createArtist(input, ctx.db);
+        const { name, genre, ...rest } = input;
+        return await createArtist(name, genre, rest, ctx.db);
       }),
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -124,6 +126,7 @@ export const appRouter = router({
           instagram: z.string().optional(),
           grade: z.string().optional(),
           availableTime: z.string().optional(),
+          preferredDays: z.string().optional(),
           instruments: z.string().optional(),
           isFavorite: z.boolean().optional(),
           notes: z.string().optional(),

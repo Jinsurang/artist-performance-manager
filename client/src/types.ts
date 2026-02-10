@@ -6,8 +6,9 @@ export interface Artist {
     phone?: string | null;
     instagram?: string | null;
     grade?: string | null;
-    availableTime?: string | null;
-    instruments?: string | null;
+    availableTime: string;
+    preferredDays: string | null;
+    instruments: string | null;
     notes?: string | null;
     isFavorite: boolean;
     createdAt: string;

@@ -119,7 +119,7 @@ export async function createArtist(data: any, dbInstance?: any) {
 
   // V3.0: Standard SQL insert for Node.js (Render)
   const result = await sqlClient`
-    INSERT INTO artists (name, genre, phone, instagram, grade, available_time, instruments, notes)
+    INSERT INTO artists (name, genre, phone, instagram, grade, available_time, preferred_days, instruments, notes)
     VALUES (
       ${data.name || ""}, 
       ${data.genre || ""}, 
@@ -127,6 +127,7 @@ export async function createArtist(data: any, dbInstance?: any) {
       ${data.instagram || null}, 
       ${data.grade || null}, 
       ${data.availableTime || null}, 
+      ${data.preferredDays || null}, 
       ${data.instruments || null}, 
       ${data.notes || null}
     )
@@ -149,7 +150,7 @@ export async function getArtists(search?: string, genre?: string, dbInstance?: a
     query = query.where(eq(artists.genre, genre));
   }
 
-  return await query;
+  return await query.orderBy(artists.name);
 }
 
 export async function searchPublicArtists(name: string, dbInstance?: any) {

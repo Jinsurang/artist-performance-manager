@@ -30,6 +30,7 @@ const GENRE_COLORS: Record<string, { bg: string, text: string, border: string }>
 
 const INSTRUMENTS = ["보컬", "기타", "건반", "드럼", "바이올린", "첼로", "콘트라베이스", "관악기"];
 const GRADE_OPTIONS = ["S", "A", "B", "C"];
+const WEEK_DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
 function SearchResults({ query, onSelect }: { query: string; onSelect: (artist: { id: number, name: string, instruments: string | null }) => void }) {
   const { data: results, isLoading } = trpc.artist.searchPublic.useQuery({ name: query }, { enabled: query.length > 0 });
@@ -120,6 +121,7 @@ export default function Home() {
     instagram: "",
     grade: "",
     availableTime: "",
+    preferredDays: [] as string[],
     instruments: {} as Record<string, number>,
     notes: "",
   });
@@ -326,6 +328,7 @@ export default function Home() {
       instagram: artist.instagram || "",
       grade: artist.grade || "",
       availableTime: artist.availableTime || "",
+      preferredDays: typeof artist.preferredDays === 'string' ? artist.preferredDays.split(',').filter(Boolean) : [],
       instruments: {},
       notes: artist.notes || "",
     });
@@ -375,6 +378,7 @@ export default function Home() {
         instagram: artistForm.instagram,
         grade: artistForm.grade,
         availableTime: artistForm.availableTime,
+        preferredDays: artistForm.preferredDays.join(","),
         instruments: instrumentsString,
         notes: artistForm.notes,
       };
@@ -389,6 +393,7 @@ export default function Home() {
           instagram: artistForm.instagram,
           grade: artistForm.grade,
           availableTime: artistForm.availableTime,
+          preferredDays: artistForm.preferredDays.join(","),
           instruments: instrumentsString,
           notes: artistForm.notes,
         });
@@ -401,6 +406,7 @@ export default function Home() {
           instagram: artistForm.instagram,
           grade: artistForm.grade,
           availableTime: artistForm.availableTime,
+          preferredDays: artistForm.preferredDays.join(","),
           instruments: instrumentsString,
           notes: artistForm.notes,
         });
@@ -489,7 +495,11 @@ export default function Home() {
                           : 'bg-emerald-50 text-emerald-700 border-emerald-100'
                         } ${isAdminView ? 'hover:opacity-80 cursor-pointer' : ''}`}
                     >
-                      {p.status === 'pending' ? '⌛ ' : ''}{p.title.split(' ')[0]}
+                      {isAdminView ? (
+                        <>{p.status === 'pending' ? '⌛ ' : ''}{p.title.split(' ')[0]}</>
+                      ) : (
+                        <>{p.status === 'pending' ? '정산 대기' : '공연 확정'}</>
+                      )}
                     </div>
                   ))}
                   {!isPast && (
@@ -771,6 +781,7 @@ export default function Home() {
                               instagram: "",
                               grade: "",
                               availableTime: "",
+                              preferredDays: [],
                               instruments: {},
                               notes: ""
                             });
@@ -1244,6 +1255,37 @@ export default function Home() {
               </div>
             </div>
             <div className="space-y-1">
+              <Label className="text-[11px] font-medium text-slate-600">선호 요일/시간</Label>
+              <div className="flex flex-wrap gap-1 mb-2">
+                {WEEK_DAYS.map(day => (
+                  <button
+                    key={day}
+                    onClick={() => {
+                      const active = artistForm.preferredDays.includes(day);
+                      setArtistForm({
+                        ...artistForm,
+                        preferredDays: active
+                          ? artistForm.preferredDays.filter(d => d !== day)
+                          : [...artistForm.preferredDays, day]
+                      });
+                    }}
+                    className={`w-8 h-8 rounded-lg text-[10px] font-bold border transition-all ${artistForm.preferredDays.includes(day)
+                      ? 'bg-primary text-white border-primary shadow-sm'
+                      : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'
+                      }`}
+                  >
+                    {day}
+                  </button>
+                ))}
+              </div>
+              <Input
+                className="h-10 rounded-xl bg-slate-50 border border-slate-200"
+                placeholder="예: 18:00 - 22:00"
+                value={artistForm.availableTime}
+                onChange={e => setArtistForm({ ...artistForm, availableTime: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
               <Label className="text-[11px] font-medium text-slate-600">악기</Label>
               <div className="grid grid-cols-3 gap-2">
                 {INSTRUMENTS.map(i => (
@@ -1264,19 +1306,22 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      <footer className="py-8 bg-slate-50/50">
-        <div className="container text-center space-y-2">
-          <div className="text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">
-            @Siglemarksworld_art
+      <footer className="py-12 bg-white border-t border-primary/5">
+        <div className="container max-w-xl mx-auto px-4 text-center space-y-4">
+          <div className="flex flex-col items-center gap-1 group cursor-pointer" onClick={() => window.open('https://www.instagram.com/singlemarks_art/', '_blank')}>
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-500 flex items-center justify-center text-white shadow-lg shadow-pink-500/20 group-hover:scale-110 transition-transform duration-300">
+              <Instagram className="h-6 w-6" />
+            </div>
+            <div className="mt-2 text-[10px] font-black text-slate-900 uppercase tracking-[0.2em]">
+              @singlemarks_art
+            </div>
+            <p className="text-[9px] font-bold text-slate-400">인스타그램에서 공연 소식을 확인하세요</p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 rounded-full text-slate-300 hover:text-pink-500 hover:bg-pink-50"
-            onClick={() => window.open('https://instagram.com/Siglemarksworld_art', '_blank')}
-          >
-            <Instagram className="h-3 w-3" />
-          </Button>
+          <div className="pt-4 flex items-center justify-center gap-4 text-[9px] font-black text-slate-300 uppercase tracking-widest">
+            <span>Since 2026</span>
+            <div className="w-1 h-1 rounded-full bg-slate-200" />
+            <span>Artist Performance Manager</span>
+          </div>
         </div>
       </footer>
     </div >

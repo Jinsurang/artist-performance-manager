@@ -53,7 +53,9 @@ export function ArtistCard({
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground bg-muted/30 p-2 rounded-lg">
                     <Clock className="h-3.5 w-3.5 text-primary/60" />
-                    <span className="truncate">{artist.availableTime || "시간 미등록"}</span>
+                    <span className="truncate">
+                        {artist.preferredDays ? `${artist.preferredDays.split(',').join('/')} ${artist.availableTime || ""}` : (artist.availableTime || "미등록")}
+                    </span>
                 </div>
             </div>
 
