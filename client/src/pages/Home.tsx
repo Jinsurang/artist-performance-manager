@@ -32,6 +32,21 @@ const GENRE_COLORS: Record<string, { bg: string, text: string, border: string }>
 const INSTRUMENTS = ["보컬", "기타", "건반", "드럼", "바이올린", "첼로", "콘트라베이스", "관악기"];
 const GRADE_OPTIONS = ["S", "A", "B", "C"];
 
+const parseInstruments = (instrumentsStr: string | null): Record<string, number> => {
+  if (!instrumentsStr) return {};
+  const result: Record<string, number> = {};
+  const parts = instrumentsStr.split(',').map(p => p.trim());
+  parts.forEach(part => {
+    const match = part.match(/(.+)\((\d+)\)/);
+    if (match) {
+      const name = match[1];
+      const count = parseInt(match[2], 10);
+      result[name] = count;
+    }
+  });
+  return result;
+};
+
 const formatPhoneNumber = (value: string) => {
   if (!value) return value;
   const phoneNumber = value.replace(/[^\d]/g, '');
@@ -364,7 +379,7 @@ export default function Home() {
       grade: artist.grade || "",
       availableTime: artist.availableTime || "",
       preferredDays: typeof artist.preferredDays === 'string' ? artist.preferredDays.split(',').filter(Boolean) : [],
-      instruments: {},
+      instruments: parseInstruments(artist.instruments),
       memberCount: artist.memberCount || 1,
       notes: artist.notes || "",
     });
@@ -1098,19 +1113,45 @@ export default function Home() {
                           )}
                         </div>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-red-600 hover:bg-red-50 rounded-xl" onClick={async () => {
-                        if (confirm("공연을 삭제하시겠습니까?")) {
-                          try {
-                            await deletePerformance.mutateAsync({ id: p.id });
-                            toast.success("공연이 삭제되었습니다.");
-                            refetchMonthlyPerfs();
-                          } catch (e) {
-                            toast.error("삭제 실패");
-                          }
-                        }
-                      }}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1">
+                        {p.status === 'pending' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl"
+                            onClick={async () => {
+                              if (confirm("공연을 확정하시겠습니까? (다른 요청들은 삭제됩니다)")) {
+                                try {
+                                  await confirmPerformance.mutateAsync({ id: p.id });
+                                  toast.success("공연이 확정되었습니다.");
+                                } catch (e) {
+                                  toast.error("확정 실패");
+                                }
+                              }
+                            }}
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 hover:text-red-600 hover:bg-red-50 rounded-xl"
+                          onClick={async () => {
+                            if (confirm("공연을 삭제하시겠습니까?")) {
+                              try {
+                                await deletePerformance.mutateAsync({ id: p.id });
+                                toast.success("공연이 삭제되었습니다.");
+                                refetchMonthlyPerfs();
+                              } catch (e) {
+                                toast.error("삭제 실패");
+                              }
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ));
                 })()}
