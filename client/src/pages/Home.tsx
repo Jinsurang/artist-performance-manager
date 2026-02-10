@@ -59,7 +59,7 @@ const formatPhoneNumber = (value: string) => {
 };
 const WEEK_DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
-function SearchResults({ query, onSelect }: { query: string; onSelect: (artist: { id: number, name: string, instruments: string | null }) => void }) {
+function SearchResults({ query, onSelect }: { query: string; onSelect: (artist: { id: number, name: string, instruments: string | null, memberCount: number }) => void }) {
   const { data: results, isLoading } = trpc.artist.searchPublic.useQuery({ name: query }, { enabled: query.length > 0 });
 
   if (isLoading) return <div className="text-[10px] text-slate-400 p-2">검색 중...</div>;
