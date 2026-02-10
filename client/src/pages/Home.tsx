@@ -264,6 +264,7 @@ export default function Home() {
       setNoticeForm({ title: "", content: "" });
       setEditingNotice(null);
       setIsNoticeOpen(false);
+      await queryClient.invalidateQueries({ queryKey: [['notice']] });
       refetchNotices();
     } catch (error: any) {
       toast.error(`작업 실패: ${error?.message || '알 수 없는 오류'}`);
@@ -275,6 +276,7 @@ export default function Home() {
     try {
       await deleteNotice.mutateAsync({ id });
       toast.success("공지가 삭제되었습니다.");
+      await queryClient.invalidateQueries({ queryKey: [['notice']] });
       refetchNotices();
     } catch (error) {
       toast.error("삭제 실패");
@@ -965,17 +967,6 @@ export default function Home() {
                 <Bell className="h-5 w-5 text-primary" />
                 공지사항 관리
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 rounded-lg text-[10px] font-bold"
-                onClick={() => {
-                  setEditingNotice(null);
-                  setNoticeForm({ title: "", content: "" });
-                }}
-              >
-                + 새 공지
-              </Button>
             </DialogTitle>
           </DialogHeader>
 
