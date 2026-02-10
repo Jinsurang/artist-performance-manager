@@ -29,7 +29,7 @@ const GENRE_COLORS: Record<string, { bg: string, text: string, border: string }>
   "가요": { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-300" },
 };
 
-const INSTRUMENTS = ["보컬", "기타", "피아노", "드럼", "바이올린", "첼로", "베이스", "관악기"];
+const INSTRUMENTS = ["보컬", "어쿠스틱기타", "일렉기타", "피아노", "드럼", "베이스기타", "콘트라베이스", "관악기", "바이올린", "그외"];
 const GRADE_OPTIONS = ["S", "A", "B", "C"];
 
 const parseInstruments = (instrumentsStr: string | null): Record<string, number> => {
@@ -134,6 +134,7 @@ export default function Home() {
   // New state for multi-date flow
   const [savedArtistId, setSavedArtistId] = useState<number | null>(null);
   const [isProfileSaved, setIsProfileSaved] = useState(false);
+  const [isEditingConfig, setIsEditingConfig] = useState(false);
   const [selectedArtistInstruments, setSelectedArtistInstruments] = useState<string>("");
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
 
@@ -530,7 +531,7 @@ export default function Home() {
                   {dayNum}
                 </span>
 
-                <div className="mt-1 space-y-1 overflow-hidden">
+                <div className="mt-1 flex flex-col gap-1 overflow-y-auto max-h-[calc(100%-1.25rem)] scrollbar-hide">
                   {isAdminView && perfs.map((p: any, idx: number) => (
                     <div
                       key={idx}
@@ -665,9 +666,15 @@ export default function Home() {
                             query={artistForm.name}
                             onSelect={(artist) => {
                               setSavedArtistId(artist.id);
-                              setArtistForm({ ...artistForm, name: artist.name });
+                              setArtistForm({
+                                ...artistForm,
+                                name: artist.name,
+                                memberCount: artist.memberCount,
+                                instruments: parseInstruments(artist.instruments)
+                              });
                               setSelectedArtistInstruments(artist.instruments || "악기 정보 없음");
                               setIsProfileSaved(true);
+                              setIsEditingConfig(false);
                               toast.success(`${artist.name}님, 환영합니다! 이제 날짜를 선택해주세요.`);
                             }}
                           />
@@ -676,29 +683,130 @@ export default function Home() {
                     )}
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-xl border border-emerald-100">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                        <Check className="h-5 w-5 text-emerald-600" />
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                          <Check className="h-5 w-5 text-emerald-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-emerald-900">{artistForm.name}</h4>
+                          <p className="text-[10px] text-emerald-600 font-medium">{selectedArtistInstruments}</p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-bold text-emerald-900">{artistForm.name}</h4>
-                        <p className="text-[10px] text-emerald-600 font-medium">{selectedArtistInstruments}</p>
+                      <div className="flex gap-2">
+                        {!isEditingConfig && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setIsEditingConfig(true)}
+                              className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 font-bold text-xs"
+                            >
+                              구성변경
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setIsProfileSaved(false);
+                                setIsEditingConfig(false);
+                                setSavedArtistId(null);
+                                setArtistForm({ ...artistForm, name: "" });
+                                setSelectedArtistInstruments("");
+                              }}
+                              className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 font-bold text-xs"
+                            >
+                              선택취소
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setIsProfileSaved(false);
-                        setSavedArtistId(null);
-                        setArtistForm({ ...artistForm, name: "" });
-                        setSelectedArtistInstruments("");
-                      }}
-                      className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100"
-                    >
-                      변경
-                    </Button>
+
+                    {isEditingConfig && (
+                      <div className="p-5 bg-white border border-slate-100 rounded-2xl space-y-5 animate-in fade-in slide-in-from-top-2 duration-300 shadow-sm">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <Label className="text-sm font-black text-slate-700">인원 수</Label>
+                            <div className="flex items-center gap-4 bg-slate-50 p-1 rounded-xl">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg bg-white shadow-sm" onClick={() => setArtistForm({ ...artistForm, memberCount: Math.max(1, artistForm.memberCount - 1) })}>-</Button>
+                              <span className="text-sm font-bold w-4 text-center">{artistForm.memberCount}명</span>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg bg-primary text-white shadow-md shadow-primary/20" onClick={() => setArtistForm({ ...artistForm, memberCount: artistForm.memberCount + 1 })}>+</Button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            {INSTRUMENTS.map((inst) => (
+                              <div key={inst} className="flex flex-col gap-1.5 p-3 rounded-2xl bg-slate-50/50 border border-slate-100">
+                                <span className="text-[10px] font-black text-slate-400 text-center uppercase tracking-tighter">{inst}</span>
+                                <div className="flex items-center justify-center gap-3">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg bg-white shadow-sm border border-slate-100" onClick={() => {
+                                    const current = artistForm.instruments[inst] || 0;
+                                    setArtistForm({
+                                      ...artistForm,
+                                      instruments: { ...artistForm.instruments, [inst]: Math.max(0, current - 1) }
+                                    });
+                                  }}>-</Button>
+                                  <span className="text-xs font-black min-w-[20px] text-center">{artistForm.instruments[inst] || 0}</span>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg bg-emerald-600 text-white shadow-md shadow-emerald-200" onClick={() => {
+                                    const current = artistForm.instruments[inst] || 0;
+                                    setArtistForm({
+                                      ...artistForm,
+                                      instruments: { ...artistForm.instruments, [inst]: current + 1 }
+                                    });
+                                  }}>+</Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button
+                            className="flex-1 h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-black text-sm shadow-lg shadow-emerald-100"
+                            onClick={async () => {
+                              if (!savedArtistId) return;
+                              const instrumentStr = Object.entries(artistForm.instruments)
+                                .filter(([_, count]) => count > 0)
+                                .map(([name, count]) => `${name}(${count})`)
+                                .join(", ");
+
+                              try {
+                                await updateArtist.mutateAsync({
+                                  id: savedArtistId,
+                                  memberCount: artistForm.memberCount,
+                                  instruments: instrumentStr
+                                });
+                                setSelectedArtistInstruments(instrumentStr);
+                                setIsEditingConfig(false);
+                                toast.success("구성이 수정되었습니다.");
+                                refetchArtists();
+                              } catch (e) {
+                                toast.error("수정 중 오류가 발생했습니다.");
+                              }
+                            }}
+                          >
+                            저장하기
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="flex-1 h-12 rounded-xl border-slate-200 text-slate-500 font-black text-sm"
+                            onClick={() => {
+                              setIsEditingConfig(false);
+                              // Re-parse current instruments if canceled
+                              const originalStr = selectedArtistInstruments;
+                              setArtistForm({
+                                ...artistForm,
+                                instruments: parseInstruments(originalStr)
+                              });
+                            }}
+                          >
+                            취소
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
