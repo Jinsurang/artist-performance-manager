@@ -60,7 +60,7 @@ function SearchResults({ query, onSelect }: { query: string; onSelect: (artist: 
         >
           <div>
             <h4 className="font-bold text-sm text-slate-700 group-hover:text-emerald-700">{artist.name}</h4>
-            <p className="text-[10px] text-slate-400 group-hover:text-emerald-500">{artist.instruments || "악기 정보 없음"}</p>
+            <p className="text-[10px] text-slate-400 group-hover:text-emerald-500">{artist.memberCount || 1}명 - {artist.instruments || "악기 정보 없음"}</p>
           </div>
           <Button size="sm" variant="ghost" className="h-7 w-7 rounded-full bg-white text-slate-300 group-hover:text-emerald-600 group-hover:bg-emerald-100">
             <Check className="h-4 w-4" />
@@ -1072,7 +1072,7 @@ export default function Home() {
                             {p.status}
                           </span>
                         </div>
-                        <h4 className="font-bold text-sm text-slate-900">{p.artistName} <span className="text-[10px] text-slate-400 font-normal">({p.artistGenre})</span></h4>
+                        <h4 className="font-bold text-sm text-slate-900">{p.artistName} <span className="text-[10px] text-slate-400 font-normal">({p.artistMemberCount || 1}명 - {p.artistGenre})</span></h4>
                         <div className="flex items-center gap-3 mt-1.5 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
                           {p.artistInstagram && (
                             <a
