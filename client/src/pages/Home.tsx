@@ -509,7 +509,15 @@ export default function Home() {
             const isPast = date < today;
             const isToday = isSameDay(date, today);
 
-            const perfs = monthlyPerfs?.filter((p: any) => isSameDay(new Date(p.performanceDate), date)) || [];
+            const perfs = (monthlyPerfs || [])
+              .filter((p: any) => isSameDay(new Date(p.performanceDate), date))
+              .sort((a: any, b: any) => {
+                const aConfirmed = a.status !== 'pending' && a.status !== 'cancelled';
+                const bConfirmed = b.status !== 'pending' && b.status !== 'cancelled';
+                if (aConfirmed && !bConfirmed) return -1;
+                if (!aConfirmed && bConfirmed) return 1;
+                return 0;
+              });
             const hasConfirmed = perfs.some((p: any) => p.status !== 'pending');
             const isSelected = selectedDates.some(d => isSameDay(d, date));
 
@@ -531,7 +539,7 @@ export default function Home() {
                   {dayNum}
                 </span>
 
-                <div className="mt-1 flex flex-col gap-1 overflow-y-auto max-h-[calc(100%-1.25rem)] scrollbar-hide">
+                <div className="mt-1 flex flex-col gap-1 overflow-y-auto max-h-[calc(100%-1.5rem)] scrollbar-hide relative z-10">
                   {isAdminView && perfs.map((p: any, idx: number) => (
                     <div
                       key={idx}
@@ -546,12 +554,12 @@ export default function Home() {
                         });
                         setIsEditPerformanceOpen(true);
                       }}
-                      className={`text-[8px] sm:text-[9px] px-1 py-0.5 rounded border font-bold truncate ${p.artistGenre && GENRE_COLORS[p.artistGenre]
+                      className={`text-[10px] sm:text-[11px] px-2 py-1 flex-shrink-0 rounded-md border font-black truncate ${p.artistGenre && GENRE_COLORS[p.artistGenre]
                         ? `${GENRE_COLORS[p.artistGenre].bg} ${GENRE_COLORS[p.artistGenre].text} ${GENRE_COLORS[p.artistGenre].border}`
                         : p.status === 'pending'
                           ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
                           : 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                        } hover:opacity-80 cursor-pointer`}
+                        } hover:opacity-100 hover:ring-1 hover:ring-primary/20 cursor-pointer shadow-sm transition-all`}
                     >
                       {p.status === 'pending' ? '⌛ ' : ''}{p.title.split(' ')[0]}
                     </div>
