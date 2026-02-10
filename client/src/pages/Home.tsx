@@ -678,9 +678,11 @@ export default function Home() {
             {/* Performance Selection */}
             <div className={`space-y-4 transition-all duration-700 ${!isProfileSaved ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
               <div className="flex items-center justify-between px-2">
-                <div className="space-y-0.5">
-                  <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">STEP 02</span>
+                <div className="flex flex-col sm:flex-row sm:items-baseline gap-x-2">
                   <h3 className="text-lg font-black tracking-tighter">공연 신청 날짜 선택</h3>
+                  <p className="text-[10px] text-slate-400 font-normal leading-tight">
+                    원하시는 날짜를 클릭하여 선택해주세요. 선택 후 하단 버튼을 눌러 일괄 신청할 수 있습니다.
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}><ChevronLeft className="h-4 w-4" /></Button>
@@ -691,18 +693,13 @@ export default function Home() {
               {renderCalendar(false)}
 
               <div className="p-4">
-                {selectedDates.length > 0 ? (
+                {selectedDates.length > 0 && (
                   <Button
                     className="w-full h-14 text-lg font-black rounded-2xl bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-200 animate-in slide-in-from-bottom-4 fade-in"
                     onClick={handleBatchApply}
                   >
                     <span className="mr-2">🚀</span> {selectedDates.length}일 공연 신청하기
                   </Button>
-                ) : (
-                  <p className="text-[10px] text-center text-slate-400 font-bold">
-                    원하시는 날짜를 클릭하여 선택해주세요.<br />
-                    선택 후 하단 버튼을 눌러 일괄 신청할 수 있습니다.
-                  </p>
                 )}
               </div>
             </div>
