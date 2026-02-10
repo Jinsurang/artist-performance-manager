@@ -317,6 +317,7 @@ export async function getMonthlyPerformances(year: number, month: number, dbInst
     artistPhone: artists.phone,
     artistInstagram: artists.instagram,
     artistMemberCount: artists.memberCount,
+    artistInstruments: artists.instruments,
   })
     .from(performances)
     .leftJoin(artists, eq(performances.artistId, artists.id))

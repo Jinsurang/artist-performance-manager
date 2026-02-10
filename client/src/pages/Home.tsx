@@ -1220,7 +1220,7 @@ export default function Home() {
                             {p.status}
                           </span>
                         </div>
-                        <h4 className="font-bold text-sm text-slate-900">{p.artistName} <span className="text-[10px] text-slate-400 font-normal">({p.artistMemberCount || 1}명 - {p.artistGenre})</span></h4>
+                        <h4 className="font-bold text-sm text-slate-900">{p.artistName} <span className="text-[10px] text-slate-400 font-normal">({p.artistMemberCount || 1}명 - {p.artistInstruments || "정보없음"})</span></h4>
                         <div className="flex items-center gap-3 mt-1.5 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
                           {p.artistInstagram && (
                             <a
