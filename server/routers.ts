@@ -86,7 +86,11 @@ export const appRouter = router({
         })
       )
       .query(async ({ input, ctx }) => {
-        return await getArtists(input.search, input.genre, ctx.db);
+        const artists = await getArtists(input.search, input.genre, ctx.db);
+        return artists.map((a: any) => ({
+          ...a,
+          genres: a.genre ? a.genre.split(',').map((g: string) => g.trim()) : []
+        }));
       }),
     searchPublic: publicProcedure
       .input(z.object({ name: z.string().min(1) }))
@@ -108,8 +112,12 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
-        const { name, genre, ...rest } = input;
-        return await createArtist(name, genre, rest, ctx.db);
+        const artist = await createArtist(input, ctx.db);
+        if (!artist) return null;
+        return {
+          ...artist,
+          genres: artist.genre ? artist.genre.split(',').map((g: string) => g.trim()) : []
+        };
       }),
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
