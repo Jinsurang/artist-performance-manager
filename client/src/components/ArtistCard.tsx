@@ -56,8 +56,8 @@ export function ArtistCard({
                     <h4 className="font-extrabold text-2xl sm:text-3xl text-slate-900 tracking-tight leading-[1.2] break-keep word-break-keep-all">
                         {artist.name || "이름 없음"}
                     </h4>
-                    <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl border-2 border-slate-300 flex items-center justify-center bg-white shadow-sm mt-0.5">
-                        <span className="text-xl sm:text-2xl font-black text-[#1B4332]">{artist.grade || "C"}</span>
+                    <div className="flex-shrink-0 min-w-[32px] sm:min-w-[40px] px-2 h-8 sm:h-10 rounded-lg border-[1.5px] border-slate-200 flex items-center justify-center bg-white shadow-sm mt-0.5">
+                        <span className="text-lg sm:text-xl font-medium text-[#1B4332]">{artist.grade || "C"}</span>
                     </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
