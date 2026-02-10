@@ -137,6 +137,7 @@ export default function Home() {
   const [isEditingConfig, setIsEditingConfig] = useState(false);
   const [selectedArtistInstruments, setSelectedArtistInstruments] = useState<string>("");
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  const [applicantMemo, setApplicantMemo] = useState("");
 
   const [noticeForm, setNoticeForm] = useState({ title: "", content: "" });
   const [isNoticeOpen, setIsNoticeOpen] = useState(false);
@@ -333,7 +334,7 @@ export default function Home() {
           artistId: savedArtistId,
           title: `${artistForm.name} 공연 신청`,
           performanceDate: date,
-          notes: "사용자 직접 신청",
+          notes: applicantMemo || "사용자 직접 신청",
         })
       ));
 
@@ -347,6 +348,7 @@ export default function Home() {
         setSavedArtistId(null);
         setArtistForm({ ...artistForm, name: "" });
         setSelectedArtistInstruments("");
+        setApplicantMemo("");
         refetchMonthlyPerfs();
       }
 
@@ -837,7 +839,17 @@ export default function Home() {
               </div>
               {renderCalendar(false)}
 
-              <div className="p-4">
+              <div className="px-4 space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-slate-500 ml-1">요청사항 메모</label>
+                  <textarea
+                    className="w-full min-h-[100px] p-4 text-sm bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 transition-all resize-none placeholder:text-slate-400 font-medium"
+                    placeholder="관리자에게 요청사항이 있다면 이곳에 남겨주세요."
+                    value={applicantMemo}
+                    onChange={(e) => setApplicantMemo(e.target.value)}
+                  />
+                </div>
+
                 {selectedDates.length > 0 && (
                   <Button
                     className="w-full h-14 text-lg font-black rounded-2xl bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-200 animate-in slide-in-from-bottom-4 fade-in"

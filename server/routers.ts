@@ -228,8 +228,8 @@ export const appRouter = router({
         // 1. Confirm this one
         await updatePerformance(input.id, { status: "confirmed" }, ctx.db);
 
-        // 2. Delete others
-        await deleteOtherDailyPendings(input.id, perf.performanceDate, ctx.db);
+        // 2. Do NOT delete others (user requested to keep them)
+        // await deleteOtherDailyPendings(input.id, perf.performanceDate, ctx.db);
 
         return { success: true };
       }),
