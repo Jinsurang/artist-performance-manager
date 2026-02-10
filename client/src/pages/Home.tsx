@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { Plus, Trash2, Edit2, Bell, Star, ChevronLeft, ChevronRight, Search, Calendar, Users, Settings, Lock, Unlock, MessageSquare, Check, X, ShieldCheck, Instagram } from "lucide-react";
+import { Plus, Trash2, Edit2, Bell, Star, ChevronLeft, ChevronRight, Search, Calendar, Users, Settings, Lock, Unlock, MessageSquare, Check, X, ShieldCheck, Instagram, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -583,7 +583,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="container py-6 px-4 max-w-xl mx-auto flex-1 space-y-6">
+      <main className="container py-6 px-4 max-w-5xl mx-auto flex-1 space-y-6">
         {!isAdmin ? (
           <>
             {/* Latest Notice Banner */}
@@ -857,7 +857,7 @@ export default function Home() {
                         )}
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-1">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 px-1">
                       {filteredArtists.map(a => <ArtistCard key={a.id} artist={a} onToggleFavorite={handleToggleFavorite} onEdit={handleEditArtist} onDelete={handleDeleteArtist} getGenreColor={(g) => getGenreStyles(g).bg} />)}
                     </div>
                   </div>
@@ -1078,6 +1078,30 @@ export default function Home() {
                           </span>
                         </div>
                         <h4 className="font-bold text-sm text-slate-900">{p.artistName} <span className="text-[10px] text-slate-400 font-normal">({p.artistGenre})</span></h4>
+                        <div className="flex items-center gap-3 mt-1.5 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
+                          {p.artistInstagram && (
+                            <a
+                              href={`https://instagram.com/${p.artistInstagram.replace(/^@/, '')}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-1 text-[10px] font-bold text-pink-600 hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Instagram className="h-3 w-3" />
+                              @{p.artistInstagram.replace(/^@/, '')}
+                            </a>
+                          )}
+                          {p.artistPhone && (
+                            <a
+                              href={`tel:${p.artistPhone}`}
+                              className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Phone className="h-3 w-3" />
+                              {p.artistPhone}
+                            </a>
+                          )}
+                        </div>
                       </div>
                       <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-red-600 hover:bg-red-50 rounded-xl" onClick={async () => {
                         if (confirm("공연을 삭제하시겠습니까?")) {

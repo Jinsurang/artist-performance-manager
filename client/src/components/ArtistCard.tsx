@@ -21,56 +21,56 @@ export function ArtistCard({
     };
 
     return (
-        <div className="rounded-[2rem] p-6 group flex flex-col h-full bg-white border-[1.5px] border-[#A8C3C3]/30 shadow-sm hover:shadow-md transition-all">
-            {/* Header: Name, Grade and Actions */}
-            <div className="flex justify-between items-start mb-6">
-                <div className="space-y-3 flex-1 min-w-0">
-                    <div className="flex items-center gap-3">
-                        <h4 className="font-extrabold text-2xl sm:text-3xl text-slate-900 tracking-tight leading-tight">
-                            {artist.name || "이름 없음"}
-                        </h4>
-                        <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl border-2 border-slate-300 flex items-center justify-center">
-                            <span className="text-xl sm:text-2xl font-black text-[#1B4332]">{artist.grade || "C"}</span>
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {artist.genres && artist.genres.length > 0 ? artist.genres.map((g) => (
-                            <span
-                                key={g}
-                                className={`text-xs px-4 py-1.5 rounded-2xl font-bold shadow-sm ${getGenreColor(g)} opacity-80`}
-                            >
-                                {g}
-                            </span>
-                        )) : (
-                            <span className="text-xs text-slate-300 italic">장르 미등록</span>
-                        )}
+        <div className="rounded-[2rem] p-6 group flex flex-col h-full bg-white border-[1.5px] border-[#A8C3C3]/30 shadow-sm hover:shadow-md transition-all relative overflow-hidden">
+            {/* Top Action Buttons - Floating for more space */}
+            <div className="absolute top-4 right-4 flex gap-0.5 z-10">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`h-8 w-8 rounded-full text-slate-400 hover:text-amber-500 hover:bg-amber-50 transition-colors ${artist.isFavorite ? "text-amber-400" : ""}`}
+                    onClick={() => onToggleFavorite(artist)}
+                >
+                    <Star className={`h-4.5 w-4.5 ${artist.isFavorite ? "fill-current" : ""}`} />
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                    onClick={() => onEdit(artist)}
+                >
+                    <Edit2 className="h-4 w-4" />
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    onClick={() => onDelete(artist.id)}
+                >
+                    <Trash2 className="h-4 w-4" />
+                </Button>
+            </div>
+
+            {/* Header: Name, Grade and Genres */}
+            <div className="mb-6 pr-24"> {/* Extra right padding to avoid buttons */}
+                <div className="flex items-start gap-3 mb-3">
+                    <h4 className="font-extrabold text-2xl sm:text-3xl text-slate-900 tracking-tight leading-[1.2] break-keep word-break-keep-all">
+                        {artist.name || "이름 없음"}
+                    </h4>
+                    <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl border-2 border-slate-300 flex items-center justify-center bg-white shadow-sm mt-0.5">
+                        <span className="text-xl sm:text-2xl font-black text-[#1B4332]">{artist.grade || "C"}</span>
                     </div>
                 </div>
-                <div className="flex gap-1 pt-1 ml-2">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className={`h-9 w-9 text-slate-400 hover:text-amber-500 hover:bg-amber-50 transition-colors ${artist.isFavorite ? "text-amber-400" : ""}`}
-                        onClick={() => onToggleFavorite(artist)}
-                    >
-                        <Star className={`h-5 w-5 ${artist.isFavorite ? "fill-current" : ""}`} />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                        onClick={() => onEdit(artist)}
-                    >
-                        <Edit2 className="h-5 w-5" />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                        onClick={() => onDelete(artist.id)}
-                    >
-                        <Trash2 className="h-5 w-5" />
-                    </Button>
+                <div className="flex flex-wrap gap-2">
+                    {artist.genres && artist.genres.length > 0 ? artist.genres.map((g) => (
+                        <span
+                            key={g}
+                            className={`text-[10px] sm:text-xs px-3 py-1 rounded-2xl font-bold shadow-sm ${getGenreColor(g)} opacity-90`}
+                        >
+                            {g}
+                        </span>
+                    )) : (
+                        <span className="text-xs text-slate-300 italic">장르 미등록</span>
+                    )}
                 </div>
             </div>
 
@@ -97,8 +97,8 @@ export function ArtistCard({
                                 <div
                                     key={day}
                                     className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] sm:text-[11px] font-black transition-all ${isSelected
-                                            ? getDayColor(day) + ' text-white shadow-sm'
-                                            : 'bg-white text-slate-200 border border-slate-100'
+                                        ? getDayColor(day) + ' text-white shadow-sm'
+                                        : 'bg-white text-slate-200 border border-slate-100'
                                         }`}
                                 >
                                     {day}
