@@ -535,9 +535,13 @@ export default function Home() {
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-primary/10 transition-opacity">
                         <Plus className="h-4 w-4 text-primary" />
                       </div>
-                    ) : !hasConfirmed && (
-                      <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${isSelected ? 'opacity-100 bg-indigo-500/10' : 'opacity-0 group-hover:opacity-100 bg-primary/10'}`}>
-                        {isSelected ? <Check className="h-6 w-6 text-indigo-600" /> : <Plus className="h-4 w-4 text-primary" />}
+                    ) : (
+                      <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${isSelected ? 'opacity-100 bg-indigo-500/10' : (hasConfirmed ? 'opacity-0' : 'opacity-0 group-hover:opacity-100 bg-primary/10')}`}>
+                        {isSelected ? (
+                          <Check className="h-6 w-6 text-indigo-600 drop-shadow-sm" />
+                        ) : (
+                          !hasConfirmed && <Plus className="h-4 w-4 text-primary" />
+                        )}
                       </div>
                     )
                   )}
