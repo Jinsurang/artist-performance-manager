@@ -444,7 +444,8 @@ export default function Home() {
         toast.success("등록 완료");
       }
       setIsArtistOpen(false);
-      refetchArtists();
+      await queryClient.invalidateQueries({ queryKey: [['artist', 'list']] });
+      await refetchArtists();
     } catch (e: any) {
       console.error('[DEBUG] Save failed:', e);
       console.error('[DEBUG] Error message:', e?.message);
@@ -503,34 +504,28 @@ export default function Home() {
                 </span>
 
                 <div className="mt-1 space-y-1 overflow-hidden">
-                  {perfs.map((p: any, idx: number) => (
+                  {isAdminView && perfs.map((p: any, idx: number) => (
                     <div
                       key={idx}
                       onClick={(e) => {
-                        if (isAdminView) {
-                          e.stopPropagation();
-                          setSelectedPerformanceToEdit(p);
-                          setPerformanceForm({
-                            artistId: p.artistId?.toString() || "",
-                            timeSlot: "",
-                            notes: p.notes || "",
-                            status: p.status
-                          });
-                          setIsEditPerformanceOpen(true);
-                        }
+                        e.stopPropagation();
+                        setSelectedPerformanceToEdit(p);
+                        setPerformanceForm({
+                          artistId: p.artistId?.toString() || "",
+                          timeSlot: "",
+                          notes: p.notes || "",
+                          status: p.status
+                        });
+                        setIsEditPerformanceOpen(true);
                       }}
                       className={`text-[8px] sm:text-[9px] px-1 py-0.5 rounded border font-bold truncate ${p.artistGenre && GENRE_COLORS[p.artistGenre]
                         ? `${GENRE_COLORS[p.artistGenre].bg} ${GENRE_COLORS[p.artistGenre].text} ${GENRE_COLORS[p.artistGenre].border}`
                         : p.status === 'pending'
                           ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
                           : 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                        } ${isAdminView ? 'hover:opacity-80 cursor-pointer' : ''}`}
+                        } hover:opacity-80 cursor-pointer`}
                     >
-                      {isAdminView ? (
-                        <>{p.status === 'pending' ? '⌛ ' : ''}{p.title.split(' ')[0]}</>
-                      ) : (
-                        <>{p.status === 'pending' ? '정산 대기' : '공연 확정'}</>
-                      )}
+                      {p.status === 'pending' ? '⌛ ' : ''}{p.title.split(' ')[0]}
                     </div>
                   ))}
                   {!isPast && (
@@ -862,7 +857,7 @@ export default function Home() {
                         )}
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-4 px-1">
                       {filteredArtists.map(a => <ArtistCard key={a.id} artist={a} onToggleFavorite={handleToggleFavorite} onEdit={handleEditArtist} onDelete={handleDeleteArtist} getGenreColor={(g) => getGenreStyles(g).bg} />)}
                     </div>
                   </div>
@@ -875,10 +870,10 @@ export default function Home() {
 
       <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
         <DialogContent className="max-w-[280px] rounded-3xl border-none p-6">
-          <DialogHeader><DialogTitle className="text-center font-black">ADMIN ACCESS</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="text-center font-normal">관리자 로그인</DialogTitle></DialogHeader>
           <div className="space-y-3 pt-2">
-            <Input type="password" placeholder="Passcode" className="h-11 rounded-xl text-center font-black tracking-widest bg-slate-50 border-none" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAdminLogin()} />
-            <Button className="w-full h-11 rounded-xl font-black text-xs" onClick={handleAdminLogin}>UNLOCK</Button>
+            <Input type="password" placeholder="암호" className="h-11 rounded-xl text-center font-normal tracking-widest bg-slate-50 border-none" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAdminLogin()} />
+            <Button className="w-full h-11 rounded-xl font-normal text-xs" onClick={handleAdminLogin}>로그인</Button>
           </div>
         </DialogContent>
       </Dialog>
