@@ -143,6 +143,7 @@ export default function Home() {
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [artistSearch, setArtistSearch] = useState("");
+  const [perfArtistSearch, setPerfArtistSearch] = useState("");
   const [editingNotice, setEditingNotice] = useState<any>(null);
 
   const today = new Date();
@@ -309,7 +310,8 @@ export default function Home() {
     genres: typeof a.genre === 'string' ? a.genre.split(',').filter(Boolean) : []
   })).filter((a: any) => {
     const matchesSearch = a.name.toLowerCase().includes(artistSearch.toLowerCase());
-    const matchesGenre = selectedGenres.length === 0 || a.genres.some((g: string) => selectedGenres.includes(g));
+    const genresArray = a.genres || [];
+    const matchesGenre = selectedGenres.length === 0 || genresArray.some((g: string) => selectedGenres.includes(g));
     const matchesFavorite = !showFavoritesOnly || a.isFavorite;
     return matchesSearch && matchesGenre && matchesFavorite;
   }) : [];
@@ -1000,74 +1002,156 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      {/* Performance Assignment Dialog */}
+      {/* Performance Assignment Dialog (Daily Management) */}
       <Dialog open={isPerformanceDialogOpen} onOpenChange={setIsPerformanceDialogOpen}>
-        <DialogContent className="max-w-md rounded-3xl p-6 border-none">
+        <DialogContent className="max-w-md rounded-3xl p-6 border-none overflow-hidden flex flex-col max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle className="font-black text-lg">
-              {selectedPerformanceDay && format(selectedPerformanceDay, 'M월 d일')} 공연 추가
+            <DialogTitle className="font-black text-lg flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                {selectedPerformanceDay && format(selectedPerformanceDay, 'M월 d일')} 공연 관리
+              </div>
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black opacity-40">ARTIST</Label>
 
-              {/* Quick Genre Filter */}
-              <div className="flex flex-wrap gap-1 mb-2">
-                {AVAILABLE_GENRES.map(g => (
-                  <button
-                    key={g}
-                    onClick={() => setSelectedGenre(prev => prev === g ? "" : g)}
-                    className={`px-2 py-0.5 rounded text-[9px] border ${selectedGenre === g ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-400 border-slate-200'}`}
-                  >
-                    {g}
-                  </button>
-                ))}
+          <div className="flex-1 overflow-y-auto space-y-6 pt-4 pr-1">
+            {/* 1. Existing Performances List */}
+            <div className="space-y-3">
+              <Label className="text-[10px] font-black opacity-40 uppercase pl-1">EXISTING PERFORMANCES</Label>
+              <div className="space-y-2">
+                {(() => {
+                  const dailyPerfs = monthlyPerfs?.filter((p: any) =>
+                    selectedPerformanceDay && isSameDay(new Date(p.performanceDate), selectedPerformanceDay)
+                  ) || [];
+
+                  if (dailyPerfs.length === 0) {
+                    return <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs font-bold">등록된 공연이 없습니다.</div>;
+                  }
+
+                  return dailyPerfs.map((p: any) => (
+                    <div key={p.id} className="p-4 bg-white border border-slate-100 rounded-2xl flex items-center justify-between gap-3 group">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-tighter">
+                            {p.timeSlot || "시간 미정"}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-tighter ${p.status === 'confirmed' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
+                            }`}>
+                            {p.status}
+                          </span>
+                        </div>
+                        <h4 className="font-bold text-sm text-slate-900">{p.artistName} <span className="text-[10px] text-slate-400 font-normal">({p.artistGenre})</span></h4>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-red-600 hover:bg-red-50 rounded-xl" onClick={async () => {
+                        if (confirm("공연을 삭제하시겠습니까?")) {
+                          try {
+                            await deletePerformance.mutateAsync({ id: p.id });
+                            toast.success("공연이 삭제되었습니다.");
+                            refetchMonthlyPerfs();
+                          } catch (e) {
+                            toast.error("삭제 실패");
+                          }
+                        }
+                      }}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ));
+                })()}
               </div>
-
-              <Select
-                value={selectedArtistForPerformance?.toString() || ""}
-                onValueChange={(value) => setSelectedArtistForPerformance(parseInt(value))}
-              >
-                <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-none">
-                  <SelectValue placeholder="아티스트 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {artists?.filter((a: any) => !selectedGenre || a.genres.includes(selectedGenre)).map((artist: any) => (
-                    <SelectItem key={artist.id} value={artist.id.toString()}>
-                      {artist.name} ({artist.genre})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
-            <Button
-              className="w-full h-12 rounded-2xl font-black text-sm"
-              onClick={async () => {
-                if (!selectedArtistForPerformance || !selectedPerformanceDay) {
-                  toast.error('아티스트를 선택해주세요.');
-                  return;
-                }
-                try {
+
+            <div className="h-px bg-slate-100" />
+
+            {/* 2. Add New Performance Section */}
+            <div className="space-y-4">
+              <Label className="text-[10px] font-black opacity-40 uppercase pl-1">ADD NEW PERFORMANCE</Label>
+
+              <div className="space-y-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">아티스트 검색</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-slate-300" />
+                    <Input
+                      placeholder="아티스트 이름을 입력하세요"
+                      value={perfArtistSearch}
+                      onChange={e => setPerfArtistSearch(e.target.value)}
+                      className="h-10 pl-9 rounded-xl bg-white border-slate-200 text-sm"
+                    />
+                  </div>
+                </div>
+
+                {perfArtistSearch.length > 0 && !selectedArtistForPerformance && (
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                    {artists?.map((a: any) => ({
+                      ...a,
+                      genresArray: typeof a.genre === 'string' ? a.genre.split(',').filter(Boolean) : []
+                    }))
+                      .filter((a: any) => a.name.toLowerCase().includes(perfArtistSearch.toLowerCase()))
+                      .map((artist: any) => (
+                        <div
+                          key={artist.id}
+                          onClick={() => {
+                            setSelectedArtistForPerformance(artist.id);
+                            setPerfArtistSearch("");
+                          }}
+                          className="p-3 bg-white hover:bg-emerald-50 border border-slate-100 hover:border-emerald-200 rounded-xl cursor-pointer transition-all flex items-center justify-between group"
+                        >
+                          <div>
+                            <h4 className="font-bold text-sm text-slate-700 group-hover:text-emerald-700">{artist.name}</h4>
+                            <p className="text-[10px] text-slate-400 group-hover:text-emerald-500">{artist.genre}</p>
+                          </div>
+                          <Plus className="h-4 w-4 text-slate-300 group-hover:text-emerald-600" />
+                        </div>
+                      ))}
+                  </div>
+                )}
+
+                {selectedArtistForPerformance && (() => {
                   const selectedArtist = artists?.find((a: any) => a.id === selectedArtistForPerformance);
-                  await createPerformance.mutateAsync({
-                    artistId: selectedArtistForPerformance,
-                    title: `${selectedArtist?.name} 공연`,
-                    performanceDate: selectedPerformanceDay,
-                    status: 'confirmed',
-                    notes: '관리자 직접 추가'
-                  });
-                  toast.success('공연이 추가되었습니다.');
-                  setIsPerformanceDialogOpen(false);
-                  setSelectedArtistForPerformance(null);
-                  refetchMonthlyPerfs();
-                } catch (error) {
-                  toast.error('공연 추가에 실패했습니다.');
-                }
-              }}
-            >
-              공연 추가
-            </Button>
+                  if (!selectedArtist) return null;
+                  return (
+                    <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-between animate-in zoom-in-95 duration-200">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-2 py-0.5 rounded-lg bg-emerald-600 text-[10px] font-black text-white uppercase tracking-tighter">선택됨</span>
+                          <span className="text-[10px] font-black text-emerald-600/60 uppercase">{selectedArtist.genre}</span>
+                        </div>
+                        <h4 className="font-black text-emerald-900 text-lg">{selectedArtist.name}</h4>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-100 rounded-full" onClick={() => setSelectedArtistForPerformance(null)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })()}
+
+                <Button
+                  className="w-full h-12 rounded-2xl font-black text-sm shadow-lg shadow-primary/20"
+                  disabled={!selectedArtistForPerformance}
+                  onClick={async () => {
+                    try {
+                      const selectedArtist = artists?.find((a: any) => a.id === selectedArtistForPerformance);
+                      await createPerformance.mutateAsync({
+                        artistId: selectedArtistForPerformance!,
+                        title: `${selectedArtist?.name} 공연`,
+                        performanceDate: selectedPerformanceDay!,
+                        status: 'confirmed',
+                        notes: '관리자 직접 추가'
+                      });
+                      toast.success('공연이 추가되었습니다.');
+                      setSelectedArtistForPerformance(null);
+                      setPerfArtistSearch("");
+                      refetchMonthlyPerfs();
+                    } catch (error) {
+                      toast.error('공연 추가에 실패했습니다.');
+                    }
+                  }}
+                >
+                  공연 추가하기
+                </Button>
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
