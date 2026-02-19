@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { Plus, Trash2, Edit2, Bell, Star, ChevronLeft, ChevronRight, Search, Calendar, Users, Settings, Lock, Unlock, MessageSquare, Check, X, ShieldCheck, Instagram, Phone } from "lucide-react";
+import { Plus, Trash2, Edit2, Bell, Star, ChevronLeft, ChevronRight, Search, Calendar, Users, Settings, Lock, Unlock, MessageSquare, Check, X, ShieldCheck, Instagram, Phone, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -176,6 +176,7 @@ export default function Home() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [artistSearch, setArtistSearch] = useState("");
   const [perfArtistSearch, setPerfArtistSearch] = useState("");
+  const [showConfirmedOnly, setShowConfirmedOnly] = useState(false);
   const [editingNotice, setEditingNotice] = useState<any>(null);
 
   const today = new Date();
@@ -217,7 +218,7 @@ export default function Home() {
   });
 
   const createPerformance = trpc.performance.create.useMutation();
-  const updatePerformance = trpc.performance.update.useMutation();
+  const updatePerformance = trpc.performance.update.useMutation({ onSuccess: () => refetchMonthlyPerfs() });
   const createPending = trpc.performance.createPending.useMutation();
   const deletePerformance = trpc.performance.delete.useMutation({ onSuccess: () => refetchMonthlyPerfs() });
   const confirmPerformance = trpc.performance.confirm.useMutation({ onSuccess: () => refetchMonthlyPerfs() });
@@ -502,7 +503,7 @@ export default function Home() {
               {d}
             </div>
           ))}
-          {Array(emptySlots).fill(null).map((_, i) => <div key={`empty-${i}`} className="bg-white/50 h-20 sm:h-28" />)}
+          {Array(emptySlots).fill(null).map((_, i) => <div key={`empty-${i}`} className="bg-white/50 min-h-[80px] sm:min-h-[112px]" />)}
           {daysInMonth.map((date, i) => {
             const dayNum = date.getDate();
             const weekDay = getDay(date);
@@ -513,6 +514,7 @@ export default function Home() {
 
             const perfs = (monthlyPerfs || [])
               .filter((p: any) => isSameDay(new Date(p.performanceDate), date))
+              .filter((p: any) => !showConfirmedOnly || p.status === 'confirmed')
               .sort((a: any, b: any) => {
                 const aConfirmed = a.status !== 'pending' && a.status !== 'cancelled';
                 const bConfirmed = b.status !== 'pending' && b.status !== 'cancelled';
@@ -535,13 +537,13 @@ export default function Home() {
                     handleDateClick(date);
                   }
                 }}
-                className={`bg-white h-20 sm:h-28 p-1 sm:p-2 border-t border-l border-primary/5 relative cursor-pointer group transition-all ${isPast ? 'opacity-40 grayscale pointer-events-none' : ''} ${isSelected ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-500 z-10' : 'hover:bg-primary/5'}`}
+                className={`bg-white min-h-[80px] sm:min-h-[112px] p-1 sm:p-2 border-t border-l border-primary/5 relative cursor-pointer group transition-all ${isPast ? 'opacity-40 grayscale pointer-events-none' : ''} ${isSelected ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-500 z-10' : 'hover:bg-primary/5'}`}
               >
                 <span className={`text-xs font-black ${isToday ? 'bg-primary text-white w-5 h-5 flex items-center justify-center rounded-full' : isSun ? 'text-red-500' : isSat ? 'text-blue-500' : ''}`}>
                   {dayNum}
                 </span>
 
-                <div className="mt-1 flex flex-col gap-1 overflow-y-auto max-h-[calc(100%-1.5rem)] scrollbar-hide relative z-10">
+                <div className="mt-1 flex flex-col gap-1 relative z-10">
                   {isAdminView && perfs.map((p: any, idx: number) => (
                     <div
                       key={idx}
@@ -556,14 +558,16 @@ export default function Home() {
                         });
                         setIsEditPerformanceOpen(true);
                       }}
-                      className={`text-[10px] sm:text-[11px] px-2 py-1 flex-shrink-0 rounded-md border font-black truncate ${p.artistGenre && GENRE_COLORS[p.artistGenre]
-                        ? `${GENRE_COLORS[p.artistGenre].bg} ${GENRE_COLORS[p.artistGenre].text} ${GENRE_COLORS[p.artistGenre].border}`
+                      className={`text-[10px] sm:text-[11px] px-2 py-1 flex-shrink-0 rounded-md border font-black whitespace-normal break-words ${p.status === 'confirmed'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                         : p.status === 'pending'
                           ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
-                          : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                          : p.artistGenre && GENRE_COLORS[p.artistGenre]
+                            ? `${GENRE_COLORS[p.artistGenre].bg} ${GENRE_COLORS[p.artistGenre].text} ${GENRE_COLORS[p.artistGenre].border}`
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-100'
                         } hover:opacity-100 hover:ring-1 hover:ring-primary/20 cursor-pointer shadow-sm transition-all`}
                     >
-                      {p.status === 'pending' ? '⌛ ' : ''}{p.title.split(' ')[0]}
+                      {p.status === 'pending' ? '⌛ ' : ''}{p.artistName || p.title.split(' ')[0]}
                     </div>
                   ))}
                   {!isPast && (
@@ -832,6 +836,14 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowConfirmedOnly(!showConfirmedOnly)}
+                    className={`h-8 rounded-xl text-[10px] font-black px-3 transition-all ${showConfirmedOnly ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-400 border-slate-200'}`}
+                  >
+                    {showConfirmedOnly ? "확정 공연만" : "전체 일정"}
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}><ChevronLeft className="h-4 w-4" /></Button>
                   <span className="text-xs font-black min-w-[60px] text-center">{format(currentMonth, "M월")}</span>
                   <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}><ChevronRight className="h-4 w-4" /></Button>
@@ -880,6 +892,14 @@ export default function Home() {
                     {currentMonth.getFullYear()}년 {currentMonth.getMonth() + 1}월
                   </h3>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowConfirmedOnly(!showConfirmedOnly)}
+                      className={`h-9 rounded-xl text-xs font-black px-4 transition-all ${showConfirmedOnly ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-400 border-slate-200'}`}
+                    >
+                      {showConfirmedOnly ? "확정 공연만 보기" : "모든 신청 보기"}
+                    </Button>
                     <Button
                       variant="outline"
                       size="icon"
@@ -1255,7 +1275,7 @@ export default function Home() {
                         )}
                       </div>
                       <div className="flex gap-1">
-                        {p.status === 'pending' && (
+                        {p.status === 'pending' ? (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1273,7 +1293,26 @@ export default function Home() {
                           >
                             <Check className="h-4 w-4" />
                           </Button>
-                        )}
+                        ) : p.status === 'confirmed' ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-xl"
+                            title="대기 상태로 되돌리기"
+                            onClick={async () => {
+                              if (confirm("공연을 다시 대기 상태(Pending)로 되돌리시겠습니까?")) {
+                                try {
+                                  await updatePerformance.mutateAsync({ id: p.id, status: 'pending' });
+                                  toast.success("대기 상태로 변경되었습니다.");
+                                } catch (e) {
+                                  toast.error("변경 실패");
+                                }
+                              }
+                            }}
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        ) : null}
                         <Button
                           variant="ghost"
                           size="icon"
