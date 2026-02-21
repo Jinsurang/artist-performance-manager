@@ -300,8 +300,9 @@ export async function getMonthlyPerformances(year: number, month: number, dbInst
   const db = dbInstance || await getDb();
   if (!db) return [];
 
-  const startDate = new Date(year, month - 1, 1, 0, 0, 0);
-  const endDate = new Date(year, month, 0, 23, 59, 59);
+  // Expand range by 1 day on each side to catch timezone offsets (e.g. KST +9)
+  const startDate = new Date(year, month - 1, 0, 0, 0, 0); // Last day of prev month
+  const endDate = new Date(year, month, 1, 23, 59, 59);    // 1st day of next month
 
   return await db.select({
     id: performances.id,
