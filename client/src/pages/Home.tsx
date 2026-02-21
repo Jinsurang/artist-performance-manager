@@ -563,7 +563,7 @@ export default function Home() {
                         className={`text-[10px] sm:text-[11px] px-2 py-1 flex-shrink-0 rounded-md border font-black whitespace-normal break-words ${isConfirmed
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                           : p.status === 'pending'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
                             : p.artistGenre && GENRE_COLORS[p.artistGenre]
                               ? `${GENRE_COLORS[p.artistGenre].bg} ${GENRE_COLORS[p.artistGenre].text} ${GENRE_COLORS[p.artistGenre].border}`
                               : 'bg-emerald-50 text-emerald-700 border-emerald-100'
