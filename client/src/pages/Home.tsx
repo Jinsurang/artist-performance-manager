@@ -156,14 +156,6 @@ export default function Home() {
     notes: "",
   });
 
-  const [selectedPerformanceToEdit, setSelectedPerformanceToEdit] = useState<any>(null);
-  const [isEditPerformanceOpen, setIsEditPerformanceOpen] = useState(false);
-  const [performanceForm, setPerformanceForm] = useState({
-    artistId: "",
-    timeSlot: "",
-    notes: "",
-    status: "scheduled"
-  });
 
   const [messageTemplate, setMessageTemplate] = useState("");
   const [currentMonth, setCurrentMonth] = useState(() => {
@@ -549,17 +541,6 @@ export default function Home() {
                     return (
                       <div
                         key={idx}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedPerformanceToEdit(p);
-                          setPerformanceForm({
-                            artistId: p.artistId?.toString() || "",
-                            timeSlot: "",
-                            notes: p.notes || "",
-                            status: p.status
-                          });
-                          setIsEditPerformanceOpen(true);
-                        }}
                         className={`text-[10px] sm:text-[11px] px-2 py-1 flex-shrink-0 rounded-md border font-black whitespace-normal break-words ${isConfirmed
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                           : p.status === 'pending'
@@ -567,7 +548,7 @@ export default function Home() {
                             : p.artistGenre && GENRE_COLORS[p.artistGenre]
                               ? `${GENRE_COLORS[p.artistGenre].bg} ${GENRE_COLORS[p.artistGenre].text} ${GENRE_COLORS[p.artistGenre].border}`
                               : 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                          } hover:opacity-100 hover:ring-1 hover:ring-primary/20 cursor-pointer shadow-sm transition-all`}
+                          } hover:opacity-100 transition-all`}
                       >
                         {p.status === 'pending' ? '⌛ ' : ''}{p.artistName || p.title.split(' ')[0]}
                       </div>
@@ -1059,83 +1040,6 @@ export default function Home() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Performance Dialog */}
-      <Dialog open={isEditPerformanceOpen} onOpenChange={setIsEditPerformanceOpen}>
-        <DialogContent className="max-w-md rounded-3xl p-6 border-none">
-          <DialogHeader>
-            <DialogTitle className="font-black text-lg">공연 정보 수정</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <div className="space-y-1">
-              <Label className="text-[10px] font-black opacity-40">STATUS</Label>
-              <Select
-                value={performanceForm.status}
-                onValueChange={(value) => setPerformanceForm({ ...performanceForm, status: value })}
-              >
-                <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-none">
-                  <SelectValue placeholder="상태 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">승인 대기 (Pending)</SelectItem>
-                  <SelectItem value="scheduled">예정됨 (Scheduled)</SelectItem>
-                  <SelectItem value="confirmed">확정됨 (Confirmed)</SelectItem>
-                  <SelectItem value="completed">완료됨 (Completed)</SelectItem>
-                  <SelectItem value="cancelled">취소됨 (Cancelled)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] font-black opacity-40">NOTES</Label>
-              <Textarea
-                className="rounded-xl bg-slate-50 border-none min-h-[100px]"
-                placeholder="메모를 입력하세요"
-                value={performanceForm.notes}
-                onChange={e => setPerformanceForm({ ...performanceForm, notes: e.target.value })}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="destructive"
-                className="flex-1 h-12 rounded-2xl font-black text-sm bg-red-100 text-red-600 hover:bg-red-200"
-                onClick={async () => {
-                  if (!selectedPerformanceToEdit) return;
-                  if (!confirm("정말 이 공연을 삭제하시겠습니까?")) return;
-                  try {
-                    await deletePerformance.mutateAsync({ id: selectedPerformanceToEdit.id });
-                    toast.success("공연이 삭제되었습니다.");
-                    setIsEditPerformanceOpen(false);
-                    refetchMonthlyPerfs();
-                  } catch (e) {
-                    toast.error("삭제 실패");
-                  }
-                }}
-              >
-                삭제하기
-              </Button>
-              <Button
-                className="flex-1 h-12 rounded-2xl font-black text-sm"
-                onClick={async () => {
-                  if (!selectedPerformanceToEdit) return;
-                  try {
-                    await updatePerformance.mutateAsync({
-                      id: selectedPerformanceToEdit.id,
-                      status: performanceForm.status as any,
-                      notes: performanceForm.notes
-                    });
-                    toast.success("공연 정보가 수정되었습니다.");
-                    setIsEditPerformanceOpen(false);
-                    refetchMonthlyPerfs();
-                  } catch (e) {
-                    toast.error("수정 실패");
-                  }
-                }}
-              >
-                수정 완료
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Notification Dialog (Management Popup) */}
       <Dialog open={isNoticeOpen} onOpenChange={setIsNoticeOpen}>
