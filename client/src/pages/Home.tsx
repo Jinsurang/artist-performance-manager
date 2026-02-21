@@ -544,48 +544,52 @@ export default function Home() {
                 </span>
 
                 <div className="mt-1 flex flex-col gap-1 relative z-10">
-                  {isAdminView && perfs.map((p: any, idx: number) => (
-                    <div
-                      key={idx}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedPerformanceToEdit(p);
-                        setPerformanceForm({
-                          artistId: p.artistId?.toString() || "",
-                          timeSlot: "",
-                          notes: p.notes || "",
-                          status: p.status
-                        });
-                        setIsEditPerformanceOpen(true);
-                      }}
-                      className={`text-[10px] sm:text-[11px] px-2 py-1 flex-shrink-0 rounded-md border font-black whitespace-normal break-words ${p.status === 'confirmed'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                        : p.status === 'pending'
-                          ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
-                          : p.artistGenre && GENRE_COLORS[p.artistGenre]
-                            ? `${GENRE_COLORS[p.artistGenre].bg} ${GENRE_COLORS[p.artistGenre].text} ${GENRE_COLORS[p.artistGenre].border}`
-                            : 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                        } hover:opacity-100 hover:ring-1 hover:ring-primary/20 cursor-pointer shadow-sm transition-all`}
-                    >
-                      {p.status === 'pending' ? '⌛ ' : ''}{p.artistName || p.title.split(' ')[0]}
-                    </div>
-                  ))}
-                  {!isPast && (
-                    isAdminView ? (
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-primary/10 transition-opacity">
-                        <Plus className="h-4 w-4 text-primary" />
+                  {isAdminView && perfs.map((p: any, idx: number) => {
+                    const isConfirmed = p.status === 'confirmed' || p.status === 'scheduled' || p.status === 'completed';
+                    return (
+                      <div
+                        key={idx}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedPerformanceToEdit(p);
+                          setPerformanceForm({
+                            artistId: p.artistId?.toString() || "",
+                            timeSlot: "",
+                            notes: p.notes || "",
+                            status: p.status
+                          });
+                          setIsEditPerformanceOpen(true);
+                        }}
+                        className={`text-[10px] sm:text-[11px] px-2 py-1 flex-shrink-0 rounded-md border font-black whitespace-normal break-words ${isConfirmed
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                          : p.status === 'pending'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                            : p.artistGenre && GENRE_COLORS[p.artistGenre]
+                              ? `${GENRE_COLORS[p.artistGenre].bg} ${GENRE_COLORS[p.artistGenre].text} ${GENRE_COLORS[p.artistGenre].border}`
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                          } hover:opacity-100 hover:ring-1 hover:ring-primary/20 cursor-pointer shadow-sm transition-all`}
+                      >
+                        {p.status === 'pending' ? '⌛ ' : ''}{p.artistName || p.title.split(' ')[0]}
                       </div>
-                    ) : (
-                      <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${isSelected ? 'opacity-100 bg-indigo-500/10' : (hasConfirmed ? 'opacity-0' : 'opacity-0 group-hover:opacity-100 bg-primary/10')}`}>
-                        {isSelected ? (
-                          <Check className="h-6 w-6 text-indigo-600 drop-shadow-sm" />
-                        ) : (
-                          !hasConfirmed && <Plus className="h-4 w-4 text-primary" />
-                        )}
-                      </div>
-                    )
-                  )}
+                    );
+                  })}
                 </div>
+
+                {!isPast && (
+                  isAdminView ? (
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-primary/10 transition-opacity">
+                      <Plus className="h-4 w-4 text-primary" />
+                    </div>
+                  ) : (
+                    <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${isSelected ? 'opacity-100 bg-indigo-500/10' : (hasConfirmed ? 'opacity-0' : 'opacity-0 group-hover:opacity-100 bg-primary/10')}`}>
+                      {isSelected ? (
+                        <Check className="h-6 w-6 text-indigo-600 drop-shadow-sm" />
+                      ) : (
+                        !hasConfirmed && <Plus className="h-4 w-4 text-primary" />
+                      )}
+                    </div>
+                  )
+                )}
               </div>
             );
           })}
