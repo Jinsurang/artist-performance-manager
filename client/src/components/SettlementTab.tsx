@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns";
 import { ko } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, AlertTriangle, Users, CalendarDays, Wallet, Banknote } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, Users, CalendarDays, Wallet, Banknote, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -61,6 +61,81 @@ function computeRow(row: SettlementRow, defaultRate: number): ComputedRow {
   return { ...row, date: new Date(row.performanceDate), headcount, rate, pre, tax, post: pre - tax };
 }
 
+async function exportSettlementExcel(year: number, month: number, groups: ArtistGroup[], totals: { pre: number; tax: number; post: number }) {
+  const XLSX = await import("xlsx");
+  const title = `${year}년 ${month}월 정산`;
+  const dateLabel = (d: Date) => format(d, "M/d(EEE)", { locale: ko });
+
+  const summaryRows: (string | number)[][] = [
+    [title],
+    [],
+    ["아티스트", "실명", "주민번호", "계좌번호", "공연 횟수", "공연일", "세전", "원천징수(3.3%)", "세후 지급액"],
+    ...groups.map(g => [
+      g.name,
+      g.realName || "",
+      g.residentNumber || "",
+      g.bankAccount || "",
+      g.rows.length,
+      g.rows.map(r => dateLabel(r.date)).join(", "),
+      g.pre,
+      g.tax,
+      g.post,
+    ]),
+    ["합계", "", "", "", groups.reduce((s, g) => s + g.rows.length, 0), "", totals.pre, totals.tax, totals.post],
+  ];
+
+  const detailRows: (string | number)[][] = [
+    [title],
+    [],
+    ["아티스트", "공연일", "요일", "실제 인원", "인원수당", "추가 팁", "세전", "원천징수(3.3%)", "세후", "실명", "주민번호", "계좌번호"],
+  ];
+  for (const g of groups) {
+    for (const r of g.rows) {
+      detailRows.push([
+        g.name,
+        format(r.date, "yyyy-MM-dd"),
+        format(r.date, "EEE", { locale: ko }),
+        r.headcount,
+        r.rate,
+        r.extraTip,
+        r.pre,
+        r.tax,
+        r.post,
+        g.realName || "",
+        g.residentNumber || "",
+        g.bankAccount || "",
+      ]);
+    }
+    detailRows.push([`${g.name} 소계`, "", "", "", "", "", g.pre, g.tax, g.post, "", "", ""]);
+    detailRows.push([]);
+  }
+  detailRows.push(["총 합계", "", "", "", "", "", totals.pre, totals.tax, totals.post, "", "", ""]);
+
+  const applyNumberFormat = (ws: import("xlsx").WorkSheet) => {
+    const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+    for (let R = range.s.r; R <= range.e.r; R++) {
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+        if (cell && cell.t === "n") cell.z = "#,##0";
+      }
+    }
+  };
+
+  const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
+  summarySheet["!cols"] = [18, 10, 16, 30, 9, 28, 12, 14, 14].map(wch => ({ wch }));
+  applyNumberFormat(summarySheet);
+
+  const detailSheet = XLSX.utils.aoa_to_sheet(detailRows);
+  detailSheet["!cols"] = [18, 12, 6, 9, 10, 10, 12, 14, 12, 10, 16, 30].map(wch => ({ wch }));
+  applyNumberFormat(detailSheet);
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, summarySheet, "지급요약");
+  XLSX.utils.book_append_sheet(wb, detailSheet, "상세내역");
+  // 한글 파일명은 일부 브라우저/OS에서 깨지거나 "download"로 저장되므로 영문 사용
+  XLSX.writeFile(wb, `settlement_${year}-${String(month).padStart(2, "0")}.xlsx`);
+}
+
 function EditableNumber({
   value,
   placeholder,
@@ -104,6 +179,7 @@ function EditableNumber({
 
 export function SettlementTab() {
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
+  const [isExporting, setIsExporting] = useState(false);
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth() + 1;
 
@@ -207,6 +283,26 @@ export function SettlementTab() {
             className="w-32"
             onCommit={next => updateSetting.mutate({ key: DEFAULT_RATE_KEY, value: String(next ?? 0) })}
           />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 rounded-lg text-xs font-black gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+            disabled={groups.length === 0 || isExporting}
+            onClick={async () => {
+              setIsExporting(true);
+              try {
+                await exportSettlementExcel(year, month, groups, totals);
+              } catch (e) {
+                console.error("[Settlement] Excel export failed:", e);
+                toast.error("엑셀 파일 생성에 실패했습니다.");
+              } finally {
+                setIsExporting(false);
+              }
+            }}
+          >
+            <Download className="h-3.5 w-3.5" />
+            엑셀 다운로드
+          </Button>
         </div>
       </div>
 
