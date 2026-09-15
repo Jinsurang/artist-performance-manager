@@ -406,7 +406,7 @@ export function SettlementTab() {
                       : "bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100"}`}
                   >
                     {r.paidAt ? "✓ " : ""}{r.artistName || r.title.split(" ")[0]}
-                    <span className={`block sm:inline sm:ml-1 text-[9px] font-bold ${r.paidAt ? "text-amber-600" : "text-emerald-500"}`}>
+                    <span className={`block sm:inline sm:ml-1 text-[9px] font-bold whitespace-nowrap ${r.paidAt ? "text-amber-600" : "text-emerald-500"}`}>
                       {r.headcount}명{r.sets === 2 ? " · 2부" : ""}
                     </span>
                   </button>
