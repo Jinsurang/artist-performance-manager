@@ -29,6 +29,7 @@ import {
   updateSetting,
   getMonthlySettlement,
   updateSettlement,
+  setSettlementPaid,
 } from "./db";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
@@ -279,6 +280,12 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
         return await updateSettlement(id, data, ctx.db);
+      }),
+    setPaid: protectedProcedure
+      .input(z.object({ ids: z.array(z.number()).min(1), paid: z.boolean() }))
+      .mutation(async ({ input, ctx }) => {
+        await setSettlementPaid(input.ids, input.paid, ctx.db);
+        return { success: true };
       }),
   }),
 

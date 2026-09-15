@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns";
 import { ko } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, AlertTriangle, Users, CalendarDays, Wallet, Banknote, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, Users, CalendarDays, Wallet, Banknote, Download, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 
 const DEFAULT_RATE_KEY = "settlement_default_rate";
+const DEFAULT_RATE_FALLBACK = 25000;
 const WITHHOLDING_RATE = 0.033;
 const HEADER_DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
@@ -23,6 +24,7 @@ type SettlementRow = {
   actualMemberCount: number | null;
   perPersonRate: number | null;
   extraTip: number;
+  paidAt: Date | string | null;
   artistName: string | null;
   artistMemberCount: number | null;
   artistRealName: string | null;
@@ -51,7 +53,14 @@ type ArtistGroup = {
   pre: number;
   tax: number;
   post: number;
+  paidCount: number;
+  paidAt: Date | null;
 };
+
+const paidLabel = (g: ArtistGroup) =>
+  g.paidCount === 0 ? "미입금"
+    : g.paidCount < g.rows.length ? `일부 입금 (${g.paidCount}/${g.rows.length})`
+      : `입금완료${g.paidAt ? ` (${format(g.paidAt, "M/d")})` : ""}`;
 
 function computeRow(row: SettlementRow, defaultRate: number): ComputedRow {
   const headcount = row.actualMemberCount ?? row.artistMemberCount ?? 1;
@@ -69,7 +78,7 @@ async function exportSettlementExcel(year: number, month: number, groups: Artist
   const summaryRows: (string | number)[][] = [
     [title],
     [],
-    ["아티스트", "실명", "주민번호", "계좌번호", "공연 횟수", "공연일", "세전", "원천징수(3.3%)", "세후 지급액"],
+    ["아티스트", "실명", "주민번호", "계좌번호", "공연 횟수", "공연일", "세전", "원천징수(3.3%)", "세후 지급액", "입금 상태"],
     ...groups.map(g => [
       g.name,
       g.realName || "",
@@ -80,14 +89,15 @@ async function exportSettlementExcel(year: number, month: number, groups: Artist
       g.pre,
       g.tax,
       g.post,
+      paidLabel(g),
     ]),
-    ["합계", "", "", "", groups.reduce((s, g) => s + g.rows.length, 0), "", totals.pre, totals.tax, totals.post],
+    ["합계", "", "", "", groups.reduce((s, g) => s + g.rows.length, 0), "", totals.pre, totals.tax, totals.post, ""],
   ];
 
   const detailRows: (string | number)[][] = [
     [title],
     [],
-    ["아티스트", "공연일", "요일", "실제 인원", "인원수당", "추가 팁", "세전", "원천징수(3.3%)", "세후", "실명", "주민번호", "계좌번호"],
+    ["아티스트", "공연일", "요일", "실제 인원", "인원수당", "추가 팁", "세전", "원천징수(3.3%)", "세후", "입금", "실명", "주민번호", "계좌번호"],
   ];
   for (const g of groups) {
     for (const r of g.rows) {
@@ -101,15 +111,16 @@ async function exportSettlementExcel(year: number, month: number, groups: Artist
         r.pre,
         r.tax,
         r.post,
+        r.paidAt ? "완료" : "",
         g.realName || "",
         g.residentNumber || "",
         g.bankAccount || "",
       ]);
     }
-    detailRows.push([`${g.name} 소계`, "", "", "", "", "", g.pre, g.tax, g.post, "", "", ""]);
+    detailRows.push([`${g.name} 소계`, "", "", "", "", "", g.pre, g.tax, g.post, "", "", "", ""]);
     detailRows.push([]);
   }
-  detailRows.push(["총 합계", "", "", "", "", "", totals.pre, totals.tax, totals.post, "", "", ""]);
+  detailRows.push(["총 합계", "", "", "", "", "", totals.pre, totals.tax, totals.post, "", "", "", ""]);
 
   const applyNumberFormat = (ws: import("xlsx").WorkSheet) => {
     const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
@@ -122,11 +133,11 @@ async function exportSettlementExcel(year: number, month: number, groups: Artist
   };
 
   const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
-  summarySheet["!cols"] = [18, 10, 16, 30, 9, 28, 12, 14, 14].map(wch => ({ wch }));
+  summarySheet["!cols"] = [18, 10, 16, 30, 9, 28, 12, 14, 14, 16].map(wch => ({ wch }));
   applyNumberFormat(summarySheet);
 
   const detailSheet = XLSX.utils.aoa_to_sheet(detailRows);
-  detailSheet["!cols"] = [18, 12, 6, 9, 10, 10, 12, 14, 12, 10, 16, 30].map(wch => ({ wch }));
+  detailSheet["!cols"] = [18, 12, 6, 9, 10, 10, 12, 14, 12, 6, 10, 16, 30].map(wch => ({ wch }));
   applyNumberFormat(detailSheet);
 
   const wb = XLSX.utils.book_new();
@@ -186,7 +197,7 @@ export function SettlementTab() {
   const utils = trpc.useUtils();
   const { data, isLoading } = trpc.settlement.getMonthly.useQuery({ year, month });
   const { data: defaultRateSetting } = trpc.settings.get.useQuery({ key: DEFAULT_RATE_KEY }, { retry: false });
-  const defaultRate = parseInt(defaultRateSetting || "0", 10) || 0;
+  const defaultRate = parseInt(defaultRateSetting || "", 10) || DEFAULT_RATE_FALLBACK;
 
   const updateSetting = trpc.settings.update.useMutation({
     onSuccess: () => {
@@ -199,6 +210,14 @@ export function SettlementTab() {
   const updateSettlement = trpc.settlement.update.useMutation({
     onSuccess: () => utils.settlement.getMonthly.invalidate({ year, month }),
     onError: () => toast.error("정산 정보 저장 실패"),
+  });
+
+  const setPaid = trpc.settlement.setPaid.useMutation({
+    onSuccess: (_, vars) => {
+      utils.settlement.getMonthly.invalidate({ year, month });
+      toast.success(vars.paid ? "입금완료로 표시했습니다." : "입금완료를 취소했습니다.");
+    },
+    onError: () => toast.error("입금 상태 저장 실패"),
   });
 
   const rows = useMemo<ComputedRow[]>(() => {
@@ -226,6 +245,8 @@ export function SettlementTab() {
           pre: 0,
           tax: 0,
           post: 0,
+          paidCount: 0,
+          paidAt: null,
         };
         map.set(key, group);
       }
@@ -233,6 +254,11 @@ export function SettlementTab() {
       group.pre += row.pre;
       group.tax += row.tax;
       group.post += row.post;
+      if (row.paidAt) {
+        group.paidCount += 1;
+        const paidAt = new Date(row.paidAt);
+        if (!group.paidAt || paidAt > group.paidAt) group.paidAt = paidAt;
+      }
     }
     return Array.from(map.values());
   }, [rows]);
@@ -243,6 +269,8 @@ export function SettlementTab() {
     pre: rows.reduce((s, r) => s + r.pre, 0),
     tax: rows.reduce((s, r) => s + r.tax, 0),
     post: rows.reduce((s, r) => s + r.post, 0),
+    unpaidPost: rows.filter(r => !r.paidAt).reduce((s, r) => s + r.post, 0),
+    paidGroups: groups.filter(g => g.paidCount === g.rows.length).length,
     missingInfo: groups.filter(g => !g.bankAccount || !g.realName).length,
   }), [groups, rows]);
 
@@ -324,6 +352,9 @@ export function SettlementTab() {
         <Card className="p-4 rounded-2xl border-none bg-indigo-600 text-white">
           <p className="text-[9px] font-black text-indigo-200 uppercase flex items-center gap-1"><Banknote className="h-3 w-3" /> 세후 지급 총액</p>
           <h4 className="text-xl font-black">{won(totals.post)}</h4>
+          <p className="text-[10px] font-bold text-indigo-200">
+            입금완료 {totals.paidGroups}/{totals.artists}팀 · 미입금 {won(totals.unpaidPost)}
+          </p>
         </Card>
       </div>
 
@@ -335,6 +366,10 @@ export function SettlementTab() {
       )}
 
       {/* Calendar */}
+      <div className="flex items-center justify-end gap-3 px-1 text-[10px] font-bold text-slate-500">
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-emerald-100 border border-emerald-200" /> 미입금</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-amber-100 border border-amber-300" /> 입금완료</span>
+      </div>
       <div className="grid grid-cols-7 gap-px bg-primary/5 rounded-xl overflow-hidden border border-primary/10">
         {HEADER_DAYS.map(d => (
           <div key={d} className={`text-center py-2 text-[10px] font-black uppercase tracking-tighter bg-white ${d === "토" ? "text-blue-500" : d === "일" ? "text-red-500" : "text-muted-foreground"}`}>
@@ -357,10 +392,12 @@ export function SettlementTab() {
                   <button
                     key={r.id}
                     onClick={() => scrollToRow(r.id)}
-                    className="text-left text-[10px] sm:text-[11px] px-1.5 py-1 rounded-md border font-black whitespace-normal break-words bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100 transition-colors"
+                    className={`text-left text-[10px] sm:text-[11px] px-1.5 py-1 rounded-md border font-black whitespace-normal break-words transition-colors ${r.paidAt
+                      ? "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200"
+                      : "bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100"}`}
                   >
-                    {r.artistName || r.title.split(" ")[0]}
-                    <span className="block sm:inline sm:ml-1 text-[9px] font-bold text-emerald-500">{r.headcount}명</span>
+                    {r.paidAt ? "✓ " : ""}{r.artistName || r.title.split(" ")[0]}
+                    <span className={`block sm:inline sm:ml-1 text-[9px] font-bold ${r.paidAt ? "text-amber-600" : "text-emerald-500"}`}>{r.headcount}명</span>
                   </button>
                 ))}
               </div>
@@ -387,13 +424,30 @@ export function SettlementTab() {
         ) : (
           groups.map(group => {
             const missing = !group.bankAccount || !group.realName;
+            const fullyPaid = group.paidCount === group.rows.length;
+            const ids = group.rows.map(r => r.id);
             return (
-              <Card key={group.key} className="rounded-2xl border-slate-200 shadow-none overflow-hidden">
-                <div className="p-4 bg-slate-50/70 border-b border-slate-100 flex flex-wrap items-start justify-between gap-3">
+              <Card key={group.key} className={`rounded-2xl shadow-none overflow-hidden ${fullyPaid ? "border-amber-300" : "border-slate-200"}`}>
+                <div className={`p-4 border-b flex flex-wrap items-start justify-between gap-3 ${fullyPaid ? "bg-amber-50 border-amber-100" : "bg-slate-50/70 border-slate-100"}`}>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-base font-black text-slate-900">{group.name}</h4>
                       <span className="text-[10px] font-bold text-slate-400">기본 {group.defaultMemberCount}명 · {group.rows.length}회 공연</span>
+                      <Button
+                        size="sm"
+                        variant={fullyPaid ? "default" : "outline"}
+                        disabled={setPaid.isPending}
+                        className={`h-7 rounded-lg text-[11px] font-black gap-1 ${fullyPaid
+                          ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500"
+                          : "border-amber-300 text-amber-700 hover:bg-amber-50"}`}
+                        onClick={() => {
+                          if (fullyPaid && !confirm(`${group.name}의 입금완료 표시를 취소할까요?`)) return;
+                          setPaid.mutate({ ids, paid: !fullyPaid });
+                        }}
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {fullyPaid ? paidLabel(group) : group.paidCount > 0 ? `${paidLabel(group)} → 전체 완료` : "입금완료"}
+                      </Button>
                     </div>
                     {missing ? (
                       <p className="mt-1 text-[11px] font-bold text-amber-600 flex items-center gap-1">
@@ -419,7 +473,10 @@ export function SettlementTab() {
                     <div id={`settle-row-${row.id}`} key={row.id} className="p-3 sm:p-4 grid grid-cols-2 sm:grid-cols-[110px_1fr_1fr_1fr_auto] gap-2 sm:gap-3 items-center transition-shadow rounded-lg">
                       <div className="col-span-2 sm:col-span-1">
                         <p className="text-sm font-black text-slate-800">{format(row.date, "M월 d일", { locale: ko })}</p>
-                        <p className="text-[10px] font-bold text-slate-400">{format(row.date, "EEEE", { locale: ko })}</p>
+                        <p className="text-[10px] font-bold text-slate-400">
+                          {format(row.date, "EEEE", { locale: ko })}
+                          {row.paidAt && <span className="ml-1.5 text-amber-600">✓ 입금완료</span>}
+                        </p>
                       </div>
                       <div className="space-y-1">
                         <Label className="text-[9px] font-black text-slate-400 uppercase">실제 인원</Label>

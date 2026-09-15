@@ -62,6 +62,7 @@ export const performances = pgTable("performances", {
   actualMemberCount: integer("actual_member_count"),
   perPersonRate: integer("per_person_rate"),
   extraTip: integer("extra_tip").default(0).notNull(),
+  paidAt: timestamp("paid_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

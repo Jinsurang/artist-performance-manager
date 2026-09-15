@@ -22,6 +22,7 @@ function ensureSchema(sqlClient: ReturnType<typeof postgres>) {
       await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS actual_member_count INTEGER`;
       await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS per_person_rate INTEGER`;
       await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS extra_tip INTEGER DEFAULT 0 NOT NULL`;
+      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP`;
     })().catch(error => {
       console.error("[Database] Schema ensure failed:", error);
       _schemaReady = null;
@@ -376,6 +377,7 @@ export async function getMonthlySettlement(year: number, month: number, dbInstan
     actualMemberCount: performances.actualMemberCount,
     perPersonRate: performances.perPersonRate,
     extraTip: performances.extraTip,
+    paidAt: performances.paidAt,
     artistName: artists.name,
     artistMemberCount: artists.memberCount,
     artistRealName: artists.realName,
@@ -400,6 +402,15 @@ export async function updateSettlement(
   const db = dbInstance || await getDb();
   if (!db) throw new Error("Database not available");
   return await db.update(performances).set({ ...data, updatedAt: new Date() }).where(eq(performances.id, id));
+}
+
+export async function setSettlementPaid(ids: number[], paid: boolean, dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db) throw new Error("Database not available");
+  if (ids.length === 0) return;
+  return await db.update(performances)
+    .set({ paidAt: paid ? new Date() : null, updatedAt: new Date() })
+    .where(inArray(performances.id, ids));
 }
 
 /**
