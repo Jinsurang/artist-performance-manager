@@ -1,4 +1,4 @@
-import { eq, sql, and, gte, lte, ne } from "drizzle-orm";
+import { eq, sql, and, gte, lte, ne, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { InsertUser, users, artists, performances, notices, InsertArtist, InsertPerformance, InsertNotice, settings } from "../drizzle/schema";
@@ -10,6 +10,25 @@ const safeProcessEnv = typeof process !== 'undefined' ? process.env : {};
 // Global singleton for the database connection
 let _db: ReturnType<typeof drizzle> | null = null;
 let _sql: ReturnType<typeof postgres> | null = null;
+let _schemaReady: Promise<void> | null = null;
+
+// 이 프로젝트는 drizzle 마이그레이션 파이프라인 없이 배포되므로, 추가된 컬럼은 첫 연결 시 멱등하게 보장한다.
+function ensureSchema(sqlClient: ReturnType<typeof postgres>) {
+  if (!_schemaReady) {
+    _schemaReady = (async () => {
+      await sqlClient`ALTER TABLE artists ADD COLUMN IF NOT EXISTS real_name VARCHAR(100)`;
+      await sqlClient`ALTER TABLE artists ADD COLUMN IF NOT EXISTS resident_number VARCHAR(20)`;
+      await sqlClient`ALTER TABLE artists ADD COLUMN IF NOT EXISTS bank_account VARCHAR(255)`;
+      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS actual_member_count INTEGER`;
+      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS per_person_rate INTEGER`;
+      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS extra_tip INTEGER DEFAULT 0 NOT NULL`;
+    })().catch(error => {
+      console.error("[Database] Schema ensure failed:", error);
+      _schemaReady = null;
+    });
+  }
+  return _schemaReady;
+}
 
 export async function getDb(databaseUrl?: string) {
   const url = databaseUrl || safeProcessEnv.DATABASE_URL;
@@ -32,6 +51,7 @@ export async function getDb(databaseUrl?: string) {
       _db = null;
     }
   }
+  if (_sql) await ensureSchema(_sql);
   return _db;
 }
 
@@ -119,18 +139,21 @@ export async function createArtist(data: any, dbInstance?: any) {
 
   // V3.0: Standard SQL insert for Node.js (Render)
   const result = await sqlClient`
-    INSERT INTO artists (name, genre, phone, instagram, grade, available_time, preferred_days, instruments, member_count, notes)
+    INSERT INTO artists (name, genre, phone, instagram, grade, available_time, preferred_days, instruments, member_count, notes, real_name, resident_number, bank_account)
     VALUES (
-      ${data.name || ""}, 
-      ${data.genre || ""}, 
-      ${data.phone || null}, 
-      ${data.instagram || null}, 
-      ${data.grade || null}, 
-      ${data.availableTime || null}, 
-      ${data.preferredDays || null}, 
-      ${data.instruments || null}, 
+      ${data.name || ""},
+      ${data.genre || ""},
+      ${data.phone || null},
+      ${data.instagram || null},
+      ${data.grade || null},
+      ${data.availableTime || null},
+      ${data.preferredDays || null},
+      ${data.instruments || null},
       ${data.memberCount || 1},
-      ${data.notes || null}
+      ${data.notes || null},
+      ${data.realName || null},
+      ${data.residentNumber || null},
+      ${data.bankAccount || null}
     )
     RETURNING *
   `;
@@ -152,6 +175,9 @@ export async function createArtist(data: any, dbInstance?: any) {
     memberCount: row.member_count,
     notes: row.notes,
     isFavorite: row.is_favorite,
+    realName: row.real_name,
+    residentNumber: row.resident_number,
+    bankAccount: row.bank_account,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -327,6 +353,53 @@ export async function getMonthlyPerformances(year: number, month: number, dbInst
       lte(performances.performanceDate, endDate)
     ))
     .orderBy(performances.performanceDate);
+}
+
+/**
+ * Settlement queries - 월별 정산 (실제 공연한 건만)
+ */
+export const SETTLEMENT_STATUSES = ["confirmed", "scheduled", "completed"] as const;
+
+export async function getMonthlySettlement(year: number, month: number, dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db) return [];
+
+  const startDate = new Date(year, month - 1, 0, 0, 0, 0);
+  const endDate = new Date(year, month, 1, 23, 59, 59);
+
+  return await db.select({
+    id: performances.id,
+    artistId: performances.artistId,
+    title: performances.title,
+    performanceDate: performances.performanceDate,
+    status: performances.status,
+    actualMemberCount: performances.actualMemberCount,
+    perPersonRate: performances.perPersonRate,
+    extraTip: performances.extraTip,
+    artistName: artists.name,
+    artistMemberCount: artists.memberCount,
+    artistRealName: artists.realName,
+    artistResidentNumber: artists.residentNumber,
+    artistBankAccount: artists.bankAccount,
+  })
+    .from(performances)
+    .leftJoin(artists, eq(performances.artistId, artists.id))
+    .where(and(
+      gte(performances.performanceDate, startDate),
+      lte(performances.performanceDate, endDate),
+      inArray(performances.status, [...SETTLEMENT_STATUSES])
+    ))
+    .orderBy(performances.performanceDate);
+}
+
+export async function updateSettlement(
+  id: number,
+  data: { actualMemberCount?: number | null; perPersonRate?: number | null; extraTip?: number },
+  dbInstance?: any
+) {
+  const db = dbInstance || await getDb();
+  if (!db) throw new Error("Database not available");
+  return await db.update(performances).set({ ...data, updatedAt: new Date() }).where(eq(performances.id, id));
 }
 
 /**

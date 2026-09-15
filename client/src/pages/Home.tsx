@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns";
 import { ko } from "date-fns/locale";
 import { ArtistCard } from "@/components/ArtistCard";
+import { SettlementTab } from "@/components/SettlementTab";
 import { Artist } from "@/types";
 
 const AVAILABLE_GENRES = ["어쿠스틱", "팝", "재즈", "포크", "인디", "락", "발라드", "브릿팝", "가요"];
@@ -56,6 +57,12 @@ const formatPhoneNumber = (value: string) => {
     return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(3)}`;
   }
   return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(3, 7)}-${phoneNumber.slice(7, 11)}`;
+};
+
+const formatResidentNumber = (value: string) => {
+  const digits = value.replace(/[^\d]/g, '').slice(0, 13);
+  if (digits.length <= 6) return digits;
+  return `${digits.slice(0, 6)}-${digits.slice(6)}`;
 };
 const WEEK_DAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
@@ -154,6 +161,9 @@ export default function Home() {
     instruments: {} as Record<string, number>,
     memberCount: 1,
     notes: "",
+    realName: "",
+    residentNumber: "",
+    bankAccount: "",
   });
 
 
@@ -383,6 +393,9 @@ export default function Home() {
       instruments: parseInstruments(artist.instruments),
       memberCount: artist.memberCount || 1,
       notes: artist.notes || "",
+      realName: artist.realName || "",
+      residentNumber: artist.residentNumber || "",
+      bankAccount: artist.bankAccount || "",
     });
     setIsArtistOpen(true);
   };
@@ -449,6 +462,9 @@ export default function Home() {
           instruments: instrumentsString,
           memberCount: artistForm.memberCount,
           notes: artistForm.notes,
+          realName: artistForm.realName,
+          residentNumber: artistForm.residentNumber,
+          bankAccount: artistForm.bankAccount,
         });
         toast.success("수정 완료");
       } else {
@@ -463,6 +479,9 @@ export default function Home() {
           instruments: instrumentsString,
           memberCount: artistForm.memberCount,
           notes: artistForm.notes,
+          realName: artistForm.realName,
+          residentNumber: artistForm.residentNumber,
+          bankAccount: artistForm.bankAccount,
         });
         toast.success("등록 완료");
       }
@@ -862,9 +881,9 @@ export default function Home() {
           /* Admin View */
           <div className="space-y-6">
             <div className="flex p-1 bg-slate-100 rounded-xl">
-              {["dashboard", "artists"].map(t => (
+              {["dashboard", "artists", "settlement"].map(t => (
                 <button key={t} onClick={() => setTab(t)} className={`flex-1 py-3.5 text-xs font-black transition-all rounded-lg ${tab === t ? 'bg-white text-primary shadow-sm' : 'text-slate-400'}`}>
-                  {t === 'dashboard' ? '일정관리' : `아티스트${artists ? `(${artists.length})` : ''}`}
+                  {t === 'dashboard' ? '일정관리' : t === 'artists' ? `아티스트${artists ? `(${artists.length})` : ''}` : '정산'}
                 </button>
               ))}
             </div>
@@ -971,7 +990,10 @@ export default function Home() {
                               preferredDays: [],
                               instruments: {},
                               memberCount: 1,
-                              notes: ""
+                              notes: "",
+                              realName: "",
+                              residentNumber: "",
+                              bankAccount: "",
                             });
                             setIsArtistOpen(true);
                           }}
@@ -1026,6 +1048,8 @@ export default function Home() {
                 </div>
               )
             }
+
+            {tab === 'settlement' && <SettlementTab />}
           </div>
         )}
       </main >
@@ -1512,6 +1536,42 @@ export default function Home() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+            <div className="space-y-3 p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100">
+              <div>
+                <Label className="text-[11px] font-black text-indigo-700">정산 정보</Label>
+                <p className="text-[10px] font-medium text-indigo-400">정산 탭 지급 리스트에 표시됩니다. 관리자만 볼 수 있습니다.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-medium text-slate-600">실명</Label>
+                  <Input
+                    className="h-10 rounded-xl bg-white border border-slate-200"
+                    placeholder="홍길동"
+                    value={artistForm.realName}
+                    onChange={e => setArtistForm({ ...artistForm, realName: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-medium text-slate-600">주민등록번호</Label>
+                  <Input
+                    className="h-10 rounded-xl bg-white border border-slate-200 tabular-nums"
+                    placeholder="000000-0000000"
+                    inputMode="numeric"
+                    value={artistForm.residentNumber}
+                    onChange={e => setArtistForm({ ...artistForm, residentNumber: formatResidentNumber(e.target.value) })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] font-medium text-slate-600">계좌번호</Label>
+                <Input
+                  className="h-10 rounded-xl bg-white border border-slate-200"
+                  placeholder="은행명 계좌번호 (예: 카카오뱅크 3333-00-0000000)"
+                  value={artistForm.bankAccount}
+                  onChange={e => setArtistForm({ ...artistForm, bankAccount: e.target.value })}
+                />
               </div>
             </div>
             <div className="space-y-1"><Label className="text-[11px] font-medium text-slate-600">메모</Label><Textarea className="rounded-xl bg-slate-50 border border-slate-200 min-h-[100px]" value={artistForm.notes} onChange={e => setArtistForm({ ...artistForm, notes: e.target.value })} /></div>

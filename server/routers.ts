@@ -27,6 +27,8 @@ import {
   upsertUser,
   getSetting,
   updateSetting,
+  getMonthlySettlement,
+  updateSettlement,
 } from "./db";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
@@ -111,6 +113,9 @@ export const appRouter = router({
           instruments: z.string().optional(),
           memberCount: z.number().default(1),
           notes: z.string().optional(),
+          realName: z.string().optional(),
+          residentNumber: z.string().optional(),
+          bankAccount: z.string().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -141,6 +146,9 @@ export const appRouter = router({
           memberCount: z.number().optional(),
           isFavorite: z.boolean().optional(),
           notes: z.string().optional(),
+          realName: z.string().optional(),
+          residentNumber: z.string().optional(),
+          bankAccount: z.string().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -248,6 +256,32 @@ export const appRouter = router({
       }),
   }),
 
+  settlement: router({
+    getMonthly: protectedProcedure
+      .input(
+        z.object({
+          year: z.number(),
+          month: z.number().min(1).max(12),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        return await getMonthlySettlement(input.year, input.month, ctx.db);
+      }),
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          actualMemberCount: z.number().int().min(0).nullable().optional(),
+          perPersonRate: z.number().int().min(0).nullable().optional(),
+          extraTip: z.number().int().min(0).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const { id, ...data } = input;
+        return await updateSettlement(id, data, ctx.db);
+      }),
+  }),
+
   notice: router({
     create: protectedProcedure
       .input(
@@ -291,7 +325,7 @@ export const appRouter = router({
     get: protectedProcedure
       .input(z.object({ key: z.string() }))
       .query(async ({ input, ctx }) => {
-        return await getSetting(input.key, ctx.db);
+        return (await getSetting(input.key, ctx.db)) ?? null;
       }),
     update: protectedProcedure
       .input(z.object({ key: z.string(), value: z.string() }))

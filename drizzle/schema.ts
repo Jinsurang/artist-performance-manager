@@ -36,6 +36,9 @@ export const artists = pgTable("artists", {
   memberCount: integer("member_count").default(1).notNull(),
   notes: text("notes"),
   isFavorite: boolean("is_favorite").default(false).notNull(),
+  realName: varchar("real_name", { length: 100 }),
+  residentNumber: varchar("resident_number", { length: 20 }),
+  bankAccount: varchar("bank_account", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -55,6 +58,10 @@ export const performances = pgTable("performances", {
   performanceDate: timestamp("performance_date").notNull(),
   status: performanceStatusEnum("status").default("scheduled").notNull(),
   notes: text("notes"),
+  // 정산: null이면 아티스트 기본 인원수 / 기본 인원수당 설정값을 사용
+  actualMemberCount: integer("actual_member_count"),
+  perPersonRate: integer("per_person_rate"),
+  extraTip: integer("extra_tip").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

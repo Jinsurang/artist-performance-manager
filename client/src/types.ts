@@ -12,6 +12,9 @@ export interface Artist {
     memberCount: number;
     notes?: string | null;
     isFavorite: boolean;
+    realName?: string | null;
+    residentNumber?: string | null;
+    bankAccount?: string | null;
     createdAt: string;
     updatedAt: string;
 }
