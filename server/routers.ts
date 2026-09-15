@@ -275,6 +275,7 @@ export const appRouter = router({
           actualMemberCount: z.number().int().min(0).nullable().optional(),
           perPersonRate: z.number().int().min(0).nullable().optional(),
           extraTip: z.number().int().min(0).optional(),
+          setCount: z.number().int().min(1).max(2).nullable().optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {

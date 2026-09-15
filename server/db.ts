@@ -23,6 +23,7 @@ function ensureSchema(sqlClient: ReturnType<typeof postgres>) {
       await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS per_person_rate INTEGER`;
       await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS extra_tip INTEGER DEFAULT 0 NOT NULL`;
       await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP`;
+      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS set_count INTEGER`;
     })().catch(error => {
       console.error("[Database] Schema ensure failed:", error);
       _schemaReady = null;
@@ -377,6 +378,7 @@ export async function getMonthlySettlement(year: number, month: number, dbInstan
     actualMemberCount: performances.actualMemberCount,
     perPersonRate: performances.perPersonRate,
     extraTip: performances.extraTip,
+    setCount: performances.setCount,
     paidAt: performances.paidAt,
     artistName: artists.name,
     artistMemberCount: artists.memberCount,
@@ -396,7 +398,7 @@ export async function getMonthlySettlement(year: number, month: number, dbInstan
 
 export async function updateSettlement(
   id: number,
-  data: { actualMemberCount?: number | null; perPersonRate?: number | null; extraTip?: number },
+  data: { actualMemberCount?: number | null; perPersonRate?: number | null; extraTip?: number; setCount?: number | null },
   dbInstance?: any
 ) {
   const db = dbInstance || await getDb();

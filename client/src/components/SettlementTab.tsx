@@ -24,6 +24,7 @@ type SettlementRow = {
   actualMemberCount: number | null;
   perPersonRate: number | null;
   extraTip: number;
+  setCount: number | null;
   paidAt: Date | string | null;
   artistName: string | null;
   artistMemberCount: number | null;
@@ -36,10 +37,15 @@ type ComputedRow = SettlementRow & {
   date: Date;
   headcount: number;
   rate: number;
+  sets: number;
   pre: number;
   tax: number;
   post: number;
 };
+
+// 금·토·일은 1부/2부 두 번 공연
+const DOUBLE_SET_WEEKDAYS = [5, 6, 0];
+const autoSetCount = (date: Date) => (DOUBLE_SET_WEEKDAYS.includes(getDay(date)) ? 2 : 1);
 
 type ArtistGroup = {
   key: string;
@@ -63,11 +69,13 @@ const paidLabel = (g: ArtistGroup) =>
       : `입금완료${g.paidAt ? ` (${format(g.paidAt, "M/d")})` : ""}`;
 
 function computeRow(row: SettlementRow, defaultRate: number): ComputedRow {
+  const date = new Date(row.performanceDate);
   const headcount = row.actualMemberCount ?? row.artistMemberCount ?? 1;
   const rate = row.perPersonRate ?? defaultRate;
-  const pre = headcount * rate + (row.extraTip || 0);
+  const sets = row.setCount ?? autoSetCount(date);
+  const pre = headcount * rate * sets + (row.extraTip || 0);
   const tax = Math.round(pre * WITHHOLDING_RATE);
-  return { ...row, date: new Date(row.performanceDate), headcount, rate, pre, tax, post: pre - tax };
+  return { ...row, date, headcount, rate, sets, pre, tax, post: pre - tax };
 }
 
 async function exportSettlementExcel(year: number, month: number, groups: ArtistGroup[], totals: { pre: number; tax: number; post: number }) {
@@ -88,7 +96,7 @@ async function exportSettlementExcel(year: number, month: number, groups: Artist
       g.post,
       g.bankAccount || "",
       g.rows.length,
-      g.rows.map(r => dateLabel(r.date)).join(", "),
+      g.rows.map(r => dateLabel(r.date) + (r.sets === 2 ? " 2부" : "")).join(", "),
       paidLabel(g),
     ]),
     ["합계", "", "", totals.pre, totals.tax, totals.post, "", groups.reduce((s, g) => s + g.rows.length, 0), "", ""],
@@ -97,7 +105,7 @@ async function exportSettlementExcel(year: number, month: number, groups: Artist
   const detailRows: (string | number)[][] = [
     [title],
     [],
-    ["아티스트", "공연일", "요일", "실제 인원", "인원수당", "추가 팁", "세전", "원천징수(3.3%)", "세후", "입금", "실명", "주민번호", "계좌번호"],
+    ["아티스트", "공연일", "요일", "부", "실제 인원", "인원수당", "추가 팁", "세전", "원천징수(3.3%)", "세후", "입금", "실명", "주민번호", "계좌번호"],
   ];
   for (const g of groups) {
     for (const r of g.rows) {
@@ -105,6 +113,7 @@ async function exportSettlementExcel(year: number, month: number, groups: Artist
         g.name,
         format(r.date, "yyyy-MM-dd"),
         format(r.date, "EEE", { locale: ko }),
+        r.sets === 2 ? "2부" : "1부",
         r.headcount,
         r.rate,
         r.extraTip,
@@ -117,10 +126,10 @@ async function exportSettlementExcel(year: number, month: number, groups: Artist
         g.bankAccount || "",
       ]);
     }
-    detailRows.push([`${g.name} 소계`, "", "", "", "", "", g.pre, g.tax, g.post, "", "", "", ""]);
+    detailRows.push([`${g.name} 소계`, "", "", "", "", "", "", g.pre, g.tax, g.post, "", "", "", ""]);
     detailRows.push([]);
   }
-  detailRows.push(["총 합계", "", "", "", "", "", totals.pre, totals.tax, totals.post, "", "", "", ""]);
+  detailRows.push(["총 합계", "", "", "", "", "", "", totals.pre, totals.tax, totals.post, "", "", "", ""]);
 
   const applyNumberFormat = (ws: import("xlsx").WorkSheet) => {
     const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
@@ -137,7 +146,7 @@ async function exportSettlementExcel(year: number, month: number, groups: Artist
   applyNumberFormat(summarySheet);
 
   const detailSheet = XLSX.utils.aoa_to_sheet(detailRows);
-  detailSheet["!cols"] = [18, 12, 6, 9, 10, 10, 12, 14, 12, 6, 10, 16, 30].map(wch => ({ wch }));
+  detailSheet["!cols"] = [18, 12, 6, 6, 9, 10, 10, 12, 14, 12, 6, 10, 16, 30].map(wch => ({ wch }));
   applyNumberFormat(detailSheet);
 
   const wb = XLSX.utils.book_new();
@@ -397,7 +406,9 @@ export function SettlementTab() {
                       : "bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100"}`}
                   >
                     {r.paidAt ? "✓ " : ""}{r.artistName || r.title.split(" ")[0]}
-                    <span className={`block sm:inline sm:ml-1 text-[9px] font-bold ${r.paidAt ? "text-amber-600" : "text-emerald-500"}`}>{r.headcount}명</span>
+                    <span className={`block sm:inline sm:ml-1 text-[9px] font-bold ${r.paidAt ? "text-amber-600" : "text-emerald-500"}`}>
+                      {r.headcount}명{r.sets === 2 ? " · 2부" : ""}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -477,6 +488,16 @@ export function SettlementTab() {
                           {format(row.date, "EEEE", { locale: ko })}
                           {row.paidAt && <span className="ml-1.5 text-amber-600">✓ 입금완료</span>}
                         </p>
+                        <label className="mt-1.5 inline-flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5 accent-indigo-600 cursor-pointer"
+                            checked={row.sets === 2}
+                            disabled={updateSettlement.isPending}
+                            onChange={e => updateSettlement.mutate({ id: row.id, setCount: e.target.checked ? 2 : 1 })}
+                          />
+                          <span className={`text-[10px] font-black ${row.sets === 2 ? "text-indigo-600" : "text-slate-400"}`}>2부 (수당 ×2)</span>
+                        </label>
                       </div>
                       <div className="space-y-1">
                         <Label className="text-[9px] font-black text-slate-400 uppercase">실제 인원</Label>
@@ -506,7 +527,9 @@ export function SettlementTab() {
                         />
                       </div>
                       <div className="text-right sm:min-w-[120px]">
-                        <p className="text-[10px] font-bold text-slate-400">{row.headcount}명 × {row.rate.toLocaleString("ko-KR")} + {row.extraTip.toLocaleString("ko-KR")}</p>
+                        <p className="text-[10px] font-bold text-slate-400">
+                          {row.headcount}명 × {row.rate.toLocaleString("ko-KR")}{row.sets === 2 ? " × 2부" : ""} + {row.extraTip.toLocaleString("ko-KR")}
+                        </p>
                         <p className="text-[11px] font-bold text-slate-500">세전 {won(row.pre)}</p>
                         <p className="text-sm font-black text-slate-800">세후 {won(row.post)}</p>
                       </div>

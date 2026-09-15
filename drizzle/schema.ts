@@ -62,6 +62,8 @@ export const performances = pgTable("performances", {
   actualMemberCount: integer("actual_member_count"),
   perPersonRate: integer("per_person_rate"),
   extraTip: integer("extra_tip").default(0).notNull(),
+  // 1부/2부 공연 횟수. null이면 요일 기준 자동 (금·토·일 = 2부)
+  setCount: integer("set_count"),
   paidAt: timestamp("paid_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
