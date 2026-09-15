@@ -78,20 +78,20 @@ async function exportSettlementExcel(year: number, month: number, groups: Artist
   const summaryRows: (string | number)[][] = [
     [title],
     [],
-    ["아티스트", "실명", "주민번호", "계좌번호", "공연 횟수", "공연일", "세전", "원천징수(3.3%)", "세후 지급액", "입금 상태"],
+    ["아티스트", "실명", "주민번호", "세전금액", "원천징수(3.3%)", "세후지급액", "계좌번호", "공연횟수", "공연일", "입금상태"],
     ...groups.map(g => [
       g.name,
       g.realName || "",
       g.residentNumber || "",
-      g.bankAccount || "",
-      g.rows.length,
-      g.rows.map(r => dateLabel(r.date)).join(", "),
       g.pre,
       g.tax,
       g.post,
+      g.bankAccount || "",
+      g.rows.length,
+      g.rows.map(r => dateLabel(r.date)).join(", "),
       paidLabel(g),
     ]),
-    ["합계", "", "", "", groups.reduce((s, g) => s + g.rows.length, 0), "", totals.pre, totals.tax, totals.post, ""],
+    ["합계", "", "", totals.pre, totals.tax, totals.post, "", groups.reduce((s, g) => s + g.rows.length, 0), "", ""],
   ];
 
   const detailRows: (string | number)[][] = [
@@ -133,7 +133,7 @@ async function exportSettlementExcel(year: number, month: number, groups: Artist
   };
 
   const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
-  summarySheet["!cols"] = [18, 10, 16, 30, 9, 28, 12, 14, 14, 16].map(wch => ({ wch }));
+  summarySheet["!cols"] = [18, 10, 16, 12, 14, 14, 30, 9, 28, 16].map(wch => ({ wch }));
   applyNumberFormat(summarySheet);
 
   const detailSheet = XLSX.utils.aoa_to_sheet(detailRows);
