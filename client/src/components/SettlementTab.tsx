@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns";
 import { ko } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, AlertTriangle, Users, CalendarDays, Wallet, Banknote, Download, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, Users, CalendarDays, Wallet, Banknote, Download, CheckCircle2, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -456,8 +456,8 @@ export function SettlementTab() {
                           setPaid.mutate({ ids, paid: !fullyPaid });
                         }}
                       >
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        {fullyPaid ? paidLabel(group) : group.paidCount > 0 ? `${paidLabel(group)} → 전체 완료` : "입금완료"}
+                        {fullyPaid ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
+                        {fullyPaid ? paidLabel(group) : group.paidCount > 0 ? `${paidLabel(group)} → 전체 완료` : "입금대기"}
                       </Button>
                     </div>
                     {missing ? (
