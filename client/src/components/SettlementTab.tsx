@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns";
 import { ko } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, AlertTriangle, Users, CalendarDays, Wallet, Banknote, Download, CheckCircle2, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle, Users, CalendarDays, Wallet, Banknote, Download, CheckCircle2, Clock, ClipboardPaste } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
+import { TipPasteDialog } from "@/components/TipPasteDialog";
 
 const DEFAULT_RATE_KEY = "settlement_default_rate";
 const DEFAULT_RATE_FALLBACK = 25000;
@@ -33,7 +34,7 @@ type SettlementRow = {
   artistBankAccount: string | null;
 };
 
-type ComputedRow = SettlementRow & {
+export type ComputedRow = SettlementRow & {
   date: Date;
   headcount: number;
   rate: number;
@@ -200,6 +201,7 @@ function EditableNumber({
 export function SettlementTab() {
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const [isExporting, setIsExporting] = useState(false);
+  const [isTipPasteOpen, setIsTipPasteOpen] = useState(false);
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth() + 1;
 
@@ -297,6 +299,23 @@ export function SettlementTab() {
 
   return (
     <div className="space-y-6">
+      <TipPasteDialog
+        open={isTipPasteOpen}
+        onOpenChange={setIsTipPasteOpen}
+        rows={rows}
+        year={year}
+        month={month}
+        onApply={async updates => {
+          try {
+            await Promise.all(updates.map(u => updateSettlement.mutateAsync({ id: u.id, extraTip: u.extraTip })));
+            toast.success(`${updates.length}건의 팁을 입력했습니다.`);
+          } catch (e) {
+            console.error("[Settlement] Tip paste apply failed:", e);
+            toast.error("일부 팁 입력에 실패했습니다. 목록을 확인해주세요.");
+          }
+        }}
+      />
+
       {/* Month navigation + default rate */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -339,6 +358,15 @@ export function SettlementTab() {
           >
             <Download className="h-3.5 w-3.5" />
             엑셀 다운로드
+          </Button>
+          <Button
+            size="sm"
+            className="h-9 rounded-lg text-xs font-black gap-1.5 bg-indigo-600 hover:bg-indigo-700"
+            disabled={rows.length === 0}
+            onClick={() => setIsTipPasteOpen(true)}
+          >
+            <ClipboardPaste className="h-3.5 w-3.5" />
+            팁정산 한번에 입력
           </Button>
         </div>
       </div>
