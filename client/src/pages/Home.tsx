@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { Plus, Trash2, Edit2, Bell, Star, ChevronLeft, ChevronRight, Search, Calendar, Users, Settings, Lock, Unlock, MessageSquare, Check, X, ShieldCheck, Instagram, Phone, RotateCcw } from "lucide-react";
+import { Plus, Trash2, Edit2, Bell, Star, ChevronLeft, ChevronRight, Search, Calendar, Users, Settings, Lock, Unlock, MessageSquare, Check, X, ShieldCheck, Instagram, Phone, RotateCcw, ArrowLeftRight } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -137,6 +137,8 @@ export default function Home() {
   const [editingArtist, setEditingArtist] = useState<Artist | null>(null);
   const [isPerformanceDialogOpen, setIsPerformanceDialogOpen] = useState(false);
   const [selectedArtistForPerformance, setSelectedArtistForPerformance] = useState<number | null>(null);
+  const [changingArtistPerfId, setChangingArtistPerfId] = useState<number | null>(null);
+  const [changeArtistSearch, setChangeArtistSearch] = useState("");
 
   // New state for multi-date flow
   const [savedArtistId, setSavedArtistId] = useState<number | null>(null);
@@ -307,6 +309,18 @@ export default function Home() {
 
   const handleSaveProfile = async () => {
     // ... (This function is no longer used in the public flow, but keeping it for now or we can remove/ignore)
+  };
+
+  const handleChangeArtist = async (perf: any, artist: any) => {
+    if (!confirm(`${perf.artistName} → ${artist.name}(으)로 변경할까요?`)) return;
+    try {
+      await updatePerformance.mutateAsync({ id: perf.id, artistId: artist.id, title: `${artist.name} 공연` });
+      toast.success(`아티스트가 ${artist.name}(으)로 변경되었습니다.`);
+      setChangingArtistPerfId(null);
+      setChangeArtistSearch("");
+    } catch (e) {
+      toast.error("아티스트 변경 실패");
+    }
   };
 
   const handleDateClick = (date: Date) => {
@@ -535,12 +549,14 @@ export default function Home() {
               });
             const hasConfirmed = perfs.some((p: any) => p.status !== 'pending');
             const isSelected = selectedDates.some(d => isSameDay(d, date));
+            // 관리자는 지난 날짜도 열어서 긴급 교체 등 사후 수정이 가능해야 한다
+            const isLocked = isPast && !isAdminView;
 
             return (
               <div
                 key={i}
                 onClick={() => {
-                  if (isPast) return;
+                  if (isLocked) return;
                   if (isAdminView) {
                     setSelectedPerformanceDay(date);
                     setIsPerformanceDialogOpen(true);
@@ -548,7 +564,7 @@ export default function Home() {
                     handleDateClick(date);
                   }
                 }}
-                className={`bg-white min-h-[80px] sm:min-h-[112px] p-1 sm:p-2 border-t border-l border-primary/5 relative cursor-pointer group transition-all ${isPast ? 'opacity-40 grayscale pointer-events-none' : ''} ${isSelected ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-500 z-10' : 'hover:bg-primary/5'}`}
+                className={`${isPast && isAdminView ? 'bg-slate-50' : 'bg-white'} min-h-[80px] sm:min-h-[112px] p-1 sm:p-2 border-t border-l border-primary/5 relative cursor-pointer group transition-all ${isLocked ? 'opacity-40 grayscale pointer-events-none' : ''} ${isSelected ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-500 z-10' : 'hover:bg-primary/5'}`}
               >
                 <span className={`text-xs font-black ${isToday ? 'bg-primary text-white w-5 h-5 flex items-center justify-center rounded-full' : isSun ? 'text-red-500' : isSat ? 'text-blue-500' : ''}`}>
                   {dayNum}
@@ -575,7 +591,7 @@ export default function Home() {
                   })}
                 </div>
 
-                {!isPast && (
+                {!isLocked && (
                   isAdminView ? (
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-primary/10 transition-opacity">
                       <Plus className="h-4 w-4 text-primary" />
@@ -1138,13 +1154,22 @@ export default function Home() {
       </Dialog>
 
       {/* Performance Assignment Dialog (Daily Management) */}
-      <Dialog open={isPerformanceDialogOpen} onOpenChange={setIsPerformanceDialogOpen}>
+      <Dialog open={isPerformanceDialogOpen} onOpenChange={(open) => {
+        setIsPerformanceDialogOpen(open);
+        if (!open) {
+          setChangingArtistPerfId(null);
+          setChangeArtistSearch("");
+        }
+      }}>
         <DialogContent className="max-w-md rounded-3xl p-6 border-none overflow-hidden flex flex-col max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="font-black text-lg flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
                 {selectedPerformanceDay && format(selectedPerformanceDay, 'M월 d일')} 공연 관리
+                {selectedPerformanceDay && selectedPerformanceDay < today && (
+                  <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-[10px] font-bold text-slate-500">지난 공연 · 사후 수정</span>
+                )}
               </div>
             </DialogTitle>
           </DialogHeader>
@@ -1164,7 +1189,8 @@ export default function Home() {
                   }
 
                   return dailyPerfs.map((p: any) => (
-                    <div key={p.id} className="p-4 bg-white border border-slate-100 rounded-2xl flex items-center justify-between gap-3 group">
+                    <div key={p.id} className={`bg-white border rounded-2xl group ${changingArtistPerfId === p.id ? 'border-indigo-200' : 'border-slate-100'}`}>
+                    <div className="p-4 flex items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-tighter ${p.status === 'confirmed' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
@@ -1207,6 +1233,18 @@ export default function Home() {
                         )}
                       </div>
                       <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`h-8 w-8 rounded-xl ${changingArtistPerfId === p.id ? 'bg-indigo-100 text-indigo-700' : 'text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50'}`}
+                          title="아티스트 변경"
+                          onClick={() => {
+                            setChangingArtistPerfId(changingArtistPerfId === p.id ? null : p.id);
+                            setChangeArtistSearch("");
+                          }}
+                        >
+                          <ArrowLeftRight className="h-4 w-4" />
+                        </Button>
                         {p.status === 'pending' ? (
                           <Button
                             variant="ghost"
@@ -1264,6 +1302,50 @@ export default function Home() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
+                    </div>
+
+                    {changingArtistPerfId === p.id && (
+                      <div className="px-4 pb-4 pt-3 space-y-2 border-t border-indigo-100 bg-indigo-50/30 rounded-b-2xl">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[10px] font-black text-indigo-700 uppercase tracking-widest">아티스트 변경</Label>
+                          <button
+                            className="text-[10px] font-bold text-slate-400 underline"
+                            onClick={() => { setChangingArtistPerfId(null); setChangeArtistSearch(""); }}
+                          >
+                            취소
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-300" />
+                          <Input
+                            autoFocus
+                            placeholder="변경할 아티스트 이름 검색"
+                            value={changeArtistSearch}
+                            onChange={e => setChangeArtistSearch(e.target.value)}
+                            className="h-9 pl-9 rounded-xl bg-white border-slate-200 text-sm"
+                          />
+                        </div>
+                        <div className="max-h-[180px] overflow-y-auto space-y-1 pr-0.5">
+                          {(artists || [])
+                            .filter((a: any) => a.id !== p.artistId && a.name.toLowerCase().includes(changeArtistSearch.toLowerCase()))
+                            .slice(0, 8)
+                            .map((a: any) => (
+                              <button
+                                key={a.id}
+                                onClick={() => handleChangeArtist(p, a)}
+                                disabled={updatePerformance.isPending}
+                                className="w-full text-left p-2.5 rounded-xl bg-white hover:bg-indigo-50 border border-slate-100 hover:border-indigo-200 flex items-center justify-between transition-colors"
+                              >
+                                <span className="text-xs font-bold text-slate-700">{a.name}</span>
+                                <span className="text-[10px] font-medium text-slate-400">{a.memberCount || 1}명 · {a.genre}</span>
+                              </button>
+                            ))}
+                        </div>
+                        <p className="text-[10px] font-medium text-slate-400 leading-relaxed">
+                          공연 건은 그대로 두고 아티스트만 바뀝니다. 팁·입금 상태는 유지되고, 정산 탭의 인원·수당은 새 아티스트 기준으로 다시 계산됩니다.
+                        </p>
+                      </div>
+                    )}
                     </div>
                   ));
                 })()}

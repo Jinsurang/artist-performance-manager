@@ -214,6 +214,7 @@ export const appRouter = router({
         z.object({
           id: z.number(),
           artistId: z.number().optional(),
+          title: z.string().optional(),
           performanceDate: z.date().optional(),
           status: z.enum(["pending", "scheduled", "confirmed", "completed", "cancelled"]).optional(),
           notes: z.string().optional(),
@@ -221,7 +222,9 @@ export const appRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
-        return await updatePerformance(id, data, ctx.db);
+        // 아티스트가 바뀌면 이전 팀 기준으로 입력한 실제 인원은 의미가 없으므로 초기화
+        const patch = data.artistId !== undefined ? { ...data, actualMemberCount: null } : data;
+        return await updatePerformance(id, patch, ctx.db);
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
