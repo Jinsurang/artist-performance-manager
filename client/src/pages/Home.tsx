@@ -564,13 +564,13 @@ export default function Home() {
                     handleDateClick(date);
                   }
                 }}
-                className={`${isPast && isAdminView ? 'bg-slate-50' : 'bg-white'} min-h-[80px] sm:min-h-[112px] p-1 sm:p-2 border-t border-l border-primary/5 relative cursor-pointer group transition-all ${isLocked ? 'opacity-40 grayscale pointer-events-none' : ''} ${isSelected ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-500 z-10' : 'hover:bg-primary/5'}`}
+                className={`${isPast && isAdminView ? 'bg-slate-200/70' : 'bg-white'} min-h-[80px] sm:min-h-[112px] p-1 sm:p-2 border-t border-l border-primary/5 relative cursor-pointer group transition-all ${isLocked ? 'opacity-40 grayscale pointer-events-none' : ''} ${isSelected ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-500 z-10' : 'hover:bg-primary/5'}`}
               >
-                <span className={`text-xs font-black ${isToday ? 'bg-primary text-white w-5 h-5 flex items-center justify-center rounded-full' : isSun ? 'text-red-500' : isSat ? 'text-blue-500' : ''}`}>
+                <span className={`text-xs font-black ${isToday ? 'bg-primary text-white w-5 h-5 flex items-center justify-center rounded-full' : isPast && isAdminView ? 'text-slate-400' : isSun ? 'text-red-500' : isSat ? 'text-blue-500' : ''}`}>
                   {dayNum}
                 </span>
 
-                <div className="mt-1 flex flex-col gap-1 relative z-10">
+                <div className={`mt-1 flex flex-col gap-1 relative z-10 ${isPast && isAdminView ? 'opacity-60 saturate-50' : ''}`}>
                   {isAdminView && perfs.map((p: any, idx: number) => {
                     const isConfirmed = p.status === 'confirmed' || p.status === 'scheduled' || p.status === 'completed';
                     return (
