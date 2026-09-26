@@ -14,7 +14,7 @@ const TIME = /(\d{1,2}):(\d{2})(?::(\d{2}))?/;
 const NUMBER = /-?\d[\d,]*(?:\.\d+)?/g;
 const NUMERIC_CELL = /^-?\d[\d,]*(?:\.\d+)?\s*원?$/;
 // 은행 내역에서 입금자명이 아닌 상투적 토큰
-const NOISE_TOKENS = new Set(["코드받기", "입금", "출금", "이체", "원", "님"]);
+const NOISE_TOKENS = new Set(["코드받기", "입금", "출금", "이체", "원"]);
 
 const isNoise = (token: string) => /^\[.?\]$/.test(token) || NOISE_TOKENS.has(token);
 
@@ -66,8 +66,10 @@ function parseLine(raw: string, defaultYear: number): ParsedLine {
       inline.forEach(tok => numbers.push(Number(tok.replace(/,/g, ""))));
       continue;
     }
-    const cleaned = rest.split(/\s+/).filter(tok => !isNoise(tok)).map(tok => tok.replace(/님$/, "")).join(" ").trim();
-    if (cleaned) textTokens.push(cleaned);
+    // 송금자명은 은행에 등록된 그대로 보존한다. 셀 전체가 상투 문구([+] 코드받기 등)일 때만 버린다.
+    const tokens = rest.split(/\s+/);
+    if (tokens.every(isNoise)) continue;
+    textTokens.push(raw.includes("\t") ? rest : tokens.filter(tok => !isNoise(tok)).join(" "));
   }
 
   if (date && isNaN(date.getTime())) date = null;
@@ -252,7 +254,8 @@ export function TipPasteDialog({
                       {!muted && (
                         <p className="pl-1 text-[10px] font-medium text-slate-500 leading-relaxed">
                           {e.tips.map((t, i) => (
-                            <span key={i} className="inline-block mr-2">
+                            <span key={i} className="inline-block mr-2.5">
+                              <span className="text-slate-400 tabular-nums">{format(t.tippedAt, "HH:mm")}</span>{" "}
                               <span className={t.depositor ? "font-bold text-slate-700" : "text-slate-400"}>{t.depositor || "무기명"}</span> {t.amount.toLocaleString("ko-KR")}
                             </span>
                           ))}

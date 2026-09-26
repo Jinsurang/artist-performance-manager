@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 import { TipPasteDialog } from "@/components/TipPasteDialog";
-import { DEFAULT_RATE_FALLBACK, won, computeSettlement, tipSummary, type SettlementAmounts, type TipEntry } from "@/lib/settlement";
+import { DEFAULT_RATE_FALLBACK, won, computeSettlement, tipSummary, tipTime, type SettlementAmounts, type TipEntry } from "@/lib/settlement";
 
 const DEFAULT_RATE_KEY = "settlement_default_rate";
 const HEADER_DAYS = ["월", "화", "수", "목", "금", "토", "일"];
@@ -548,7 +548,8 @@ export function SettlementTab() {
                         {row.tips.length > 0 && (
                           <p className="text-[10px] font-medium text-slate-500 leading-snug">
                             {row.tips.map(t => (
-                              <span key={t.id} className="inline-block mr-1.5 whitespace-nowrap">
+                              <span key={t.id} className="inline-block mr-2 whitespace-nowrap">
+                                <span className="text-slate-400 tabular-nums">{tipTime(t)}</span>{" "}
                                 <span className={t.depositor ? "font-bold text-slate-700" : "text-slate-400"}>{t.depositor || "무기명"}</span> {t.amount.toLocaleString("ko-KR")}
                               </span>
                             ))}

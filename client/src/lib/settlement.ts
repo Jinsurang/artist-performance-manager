@@ -1,4 +1,4 @@
-import { getDay } from "date-fns";
+import { format, getDay } from "date-fns";
 
 export const DEFAULT_RATE_FALLBACK = 25000;
 export const WITHHOLDING_RATE = 0.033;
@@ -46,5 +46,8 @@ export type TipEntry = {
   depositor: string | null;
 };
 
+// 입금 시각으로 1부/2부를 구분할 수 있게 시:분을 함께 표기
+export const tipTime = (t: TipEntry) => format(new Date(t.tippedAt), "HH:mm");
+
 export const tipSummary = (tips: TipEntry[]) =>
-  tips.map(t => `${t.depositor || "무기명"} ${t.amount.toLocaleString("ko-KR")}`).join(" · ");
+  tips.map(t => `${tipTime(t)} ${t.depositor || "무기명"} ${t.amount.toLocaleString("ko-KR")}`).join(" · ");
