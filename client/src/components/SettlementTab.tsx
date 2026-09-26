@@ -9,13 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 import { TipPasteDialog } from "@/components/TipPasteDialog";
+import { DEFAULT_RATE_FALLBACK, won, computeSettlement, tipSummary, type SettlementAmounts, type TipEntry } from "@/lib/settlement";
 
 const DEFAULT_RATE_KEY = "settlement_default_rate";
-const DEFAULT_RATE_FALLBACK = 25000;
-const WITHHOLDING_RATE = 0.033;
 const HEADER_DAYS = ["월", "화", "수", "목", "금", "토", "일"];
-
-const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
 type SettlementRow = {
   id: number;
@@ -34,19 +31,7 @@ type SettlementRow = {
   artistBankAccount: string | null;
 };
 
-export type ComputedRow = SettlementRow & {
-  date: Date;
-  headcount: number;
-  rate: number;
-  sets: number;
-  pre: number;
-  tax: number;
-  post: number;
-};
-
-// 금·토·일은 1부/2부 두 번 공연
-const DOUBLE_SET_WEEKDAYS = [5, 6, 0];
-const autoSetCount = (date: Date) => (DOUBLE_SET_WEEKDAYS.includes(getDay(date)) ? 2 : 1);
+export type ComputedRow = SettlementRow & SettlementAmounts & { tips: TipEntry[] };
 
 type ArtistGroup = {
   key: string;
@@ -68,16 +53,6 @@ const paidLabel = (g: ArtistGroup) =>
   g.paidCount === 0 ? "미입금"
     : g.paidCount < g.rows.length ? `일부 입금 (${g.paidCount}/${g.rows.length})`
       : `입금완료${g.paidAt ? ` (${format(g.paidAt, "M/d")})` : ""}`;
-
-function computeRow(row: SettlementRow, defaultRate: number): ComputedRow {
-  const date = new Date(row.performanceDate);
-  const headcount = row.actualMemberCount ?? row.artistMemberCount ?? 1;
-  const rate = row.perPersonRate ?? defaultRate;
-  const sets = row.setCount ?? autoSetCount(date);
-  const pre = headcount * rate * sets + (row.extraTip || 0);
-  const tax = Math.round(pre * WITHHOLDING_RATE);
-  return { ...row, date, headcount, rate, sets, pre, tax, post: pre - tax };
-}
 
 async function exportSettlementExcel(year: number, month: number, groups: ArtistGroup[], totals: { pre: number; tax: number; post: number }) {
   const XLSX = await import("xlsx");
@@ -106,7 +81,7 @@ async function exportSettlementExcel(year: number, month: number, groups: Artist
   const detailRows: (string | number)[][] = [
     [title],
     [],
-    ["아티스트", "공연일", "요일", "부", "실제 인원", "인원수당", "추가 팁", "세전", "원천징수(3.3%)", "세후", "입금", "실명", "주민번호", "계좌번호"],
+    ["아티스트", "공연일", "요일", "부", "실제 인원", "인원수당", "추가 팁", "팁 입금자", "세전", "원천징수(3.3%)", "세후", "입금", "실명", "주민번호", "계좌번호"],
   ];
   for (const g of groups) {
     for (const r of g.rows) {
@@ -118,6 +93,7 @@ async function exportSettlementExcel(year: number, month: number, groups: Artist
         r.headcount,
         r.rate,
         r.extraTip,
+        tipSummary(r.tips),
         r.pre,
         r.tax,
         r.post,
@@ -127,10 +103,10 @@ async function exportSettlementExcel(year: number, month: number, groups: Artist
         g.bankAccount || "",
       ]);
     }
-    detailRows.push([`${g.name} 소계`, "", "", "", "", "", "", g.pre, g.tax, g.post, "", "", "", ""]);
+    detailRows.push([`${g.name} 소계`, "", "", "", "", "", "", "", g.pre, g.tax, g.post, "", "", "", ""]);
     detailRows.push([]);
   }
-  detailRows.push(["총 합계", "", "", "", "", "", "", totals.pre, totals.tax, totals.post, "", "", "", ""]);
+  detailRows.push(["총 합계", "", "", "", "", "", "", "", totals.pre, totals.tax, totals.post, "", "", "", ""]);
 
   const applyNumberFormat = (ws: import("xlsx").WorkSheet) => {
     const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
@@ -147,7 +123,7 @@ async function exportSettlementExcel(year: number, month: number, groups: Artist
   applyNumberFormat(summarySheet);
 
   const detailSheet = XLSX.utils.aoa_to_sheet(detailRows);
-  detailSheet["!cols"] = [18, 12, 6, 6, 9, 10, 10, 12, 14, 12, 6, 10, 16, 30].map(wch => ({ wch }));
+  detailSheet["!cols"] = [18, 12, 6, 6, 9, 10, 10, 28, 12, 14, 12, 6, 10, 16, 30].map(wch => ({ wch }));
   applyNumberFormat(detailSheet);
 
   const wb = XLSX.utils.book_new();
@@ -207,6 +183,7 @@ export function SettlementTab() {
 
   const utils = trpc.useUtils();
   const { data, isLoading } = trpc.settlement.getMonthly.useQuery({ year, month });
+  const { data: tipsData } = trpc.settlement.getMonthlyTips.useQuery({ year, month });
   const { data: defaultRateSetting } = trpc.settings.get.useQuery({ key: DEFAULT_RATE_KEY }, { retry: false });
   const defaultRate = parseInt(defaultRateSetting || "", 10) || DEFAULT_RATE_FALLBACK;
 
@@ -218,9 +195,18 @@ export function SettlementTab() {
     onError: () => toast.error("기본 인원수당 저장 실패"),
   });
 
+  const invalidateMonth = () => {
+    utils.settlement.getMonthly.invalidate({ year, month });
+    utils.settlement.getMonthlyTips.invalidate({ year, month });
+  };
+
   const updateSettlement = trpc.settlement.update.useMutation({
-    onSuccess: () => utils.settlement.getMonthly.invalidate({ year, month }),
+    onSuccess: invalidateMonth,
     onError: () => toast.error("정산 정보 저장 실패"),
+  });
+
+  const applyTips = trpc.settlement.applyTips.useMutation({
+    onSuccess: invalidateMonth,
   });
 
   const setPaid = trpc.settlement.setPaid.useMutation({
@@ -232,11 +218,17 @@ export function SettlementTab() {
   });
 
   const rows = useMemo<ComputedRow[]>(() => {
+    const tipsByPerf = new Map<number, TipEntry[]>();
+    for (const t of (tipsData || []) as TipEntry[]) {
+      const list = tipsByPerf.get(t.performanceId) || [];
+      list.push(t);
+      tipsByPerf.set(t.performanceId, list);
+    }
     return ((data || []) as SettlementRow[])
-      .map(r => computeRow(r, defaultRate))
+      .map(r => ({ ...r, ...computeSettlement(r, defaultRate), tips: tipsByPerf.get(r.id) || [] }))
       .filter(r => r.date.getFullYear() === year && r.date.getMonth() === month - 1)
       .sort((a, b) => a.date.getTime() - b.date.getTime());
-  }, [data, defaultRate, year, month]);
+  }, [data, tipsData, defaultRate, year, month]);
 
   const groups = useMemo<ArtistGroup[]>(() => {
     const map = new Map<string, ArtistGroup>();
@@ -305,13 +297,13 @@ export function SettlementTab() {
         rows={rows}
         year={year}
         month={month}
-        onApply={async updates => {
+        onApply={async entries => {
           try {
-            await Promise.all(updates.map(u => updateSettlement.mutateAsync({ id: u.id, extraTip: u.extraTip })));
-            toast.success(`${updates.length}건의 팁을 입력했습니다.`);
+            await applyTips.mutateAsync({ entries });
+            toast.success(`${entries.length}건의 팁을 입력했습니다.`);
           } catch (e) {
             console.error("[Settlement] Tip paste apply failed:", e);
-            toast.error("일부 팁 입력에 실패했습니다. 목록을 확인해주세요.");
+            toast.error("팁 입력에 실패했습니다. 목록을 확인해주세요.");
           }
         }}
       />
@@ -553,6 +545,15 @@ export function SettlementTab() {
                           suffix="원"
                           onCommit={next => updateSettlement.mutate({ id: row.id, extraTip: next ?? 0 })}
                         />
+                        {row.tips.length > 0 && (
+                          <p className="text-[10px] font-medium text-slate-500 leading-snug">
+                            {row.tips.map(t => (
+                              <span key={t.id} className="inline-block mr-1.5 whitespace-nowrap">
+                                <span className={t.depositor ? "font-bold text-slate-700" : "text-slate-400"}>{t.depositor || "무기명"}</span> {t.amount.toLocaleString("ko-KR")}
+                              </span>
+                            ))}
+                          </p>
+                        )}
                       </div>
                       <div className="text-right sm:min-w-[120px]">
                         <p className="text-[10px] font-bold text-slate-400">

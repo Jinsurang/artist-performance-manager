@@ -30,10 +30,35 @@ import {
   getMonthlySettlement,
   updateSettlement,
   setSettlementPaid,
+  replacePerformanceTips,
+  getTipsForMonth,
+  getTipsForPerformanceIds,
+  findArtistsForPortal,
+  countRecentPortalFailures,
+  recordPortalAttempt,
+  getPortalSettlement,
 } from "./db";
 import { sdk } from "./_core/sdk";
-import { ENV } from "./_core/env";
+import { ENV, getEnv } from "./_core/env";
 import { ONE_YEAR_MS } from "@shared/const";
+import { SignJWT, jwtVerify } from "jose";
+
+const PORTAL_SCOPE = "artist-portal";
+const PORTAL_TOKEN_TTL_SEC = 60 * 60;
+const PORTAL_LOCK_WINDOW_MIN = 15;
+const PORTAL_MAX_FAILURES = 5;
+
+const portalSecret = (env: any) => new TextEncoder().encode(getEnv(env).cookieSecret);
+
+async function verifyPortalToken(token: string, env: any): Promise<number[]> {
+  try {
+    const { payload } = await jwtVerify(token, portalSecret(env), { algorithms: ["HS256"] });
+    if (payload.scope !== PORTAL_SCOPE || !Array.isArray(payload.artistIds)) throw new Error("bad scope");
+    return (payload.artistIds as unknown[]).map(Number).filter(n => Number.isInteger(n) && n > 0);
+  } catch {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "조회 세션이 만료되었습니다. 다시 확인해주세요." });
+  }
+}
 
 export const appRouter = router({
   system: systemRouter,
@@ -290,6 +315,81 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         await setSettlementPaid(input.ids, input.paid, ctx.db);
         return { success: true };
+      }),
+    getMonthlyTips: protectedProcedure
+      .input(z.object({ year: z.number(), month: z.number().min(1).max(12) }))
+      .query(async ({ input, ctx }) => {
+        return await getTipsForMonth(input.year, input.month, ctx.db);
+      }),
+    applyTips: protectedProcedure
+      .input(
+        z.object({
+          entries: z.array(
+            z.object({
+              performanceId: z.number(),
+              tips: z.array(
+                z.object({
+                  tippedAt: z.date(),
+                  amount: z.number().int().min(0),
+                  depositor: z.string().max(100).optional().nullable(),
+                })
+              ),
+            })
+          ).min(1),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        for (const entry of input.entries) {
+          await replacePerformanceTips(entry.performanceId, entry.tips, ctx.db);
+        }
+        return { success: true, count: input.entries.length };
+      }),
+  }),
+
+  artistPortal: router({
+    login: publicProcedure
+      .input(
+        z.object({
+          name: z.string().trim().min(1).max(50),
+          phoneLast4: z.string().regex(/^\d{4}$/),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const nameKey = input.name.trim().toLowerCase();
+        const failures = await countRecentPortalFailures(nameKey, PORTAL_LOCK_WINDOW_MIN, ctx.db);
+        if (failures >= PORTAL_MAX_FAILURES) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "확인 시도가 너무 많습니다. 15분 후 다시 시도해주세요." });
+        }
+
+        const matched = await findArtistsForPortal(input.name, input.phoneLast4, ctx.db);
+        if (matched.length === 0) {
+          await recordPortalAttempt(nameKey, false, ctx.db);
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "일치하는 정보가 없습니다. 담당자 실명과 연락처 뒷 4자리를 확인해주세요." });
+        }
+        await recordPortalAttempt(nameKey, true, ctx.db);
+
+        const expiresAt = Math.floor(Date.now() / 1000) + PORTAL_TOKEN_TTL_SEC;
+        const token = await new SignJWT({ scope: PORTAL_SCOPE, artistIds: matched.map((a: any) => a.id) })
+          .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+          .setIssuedAt()
+          .setExpirationTime(expiresAt)
+          .sign(portalSecret(ctx.env));
+
+        return {
+          token,
+          expiresAt: expiresAt * 1000,
+          realName: matched[0].realName,
+          artists: matched.map((a: any) => ({ id: a.id, name: a.name })),
+        };
+      }),
+    getSettlement: publicProcedure
+      .input(z.object({ token: z.string(), year: z.number(), month: z.number().min(1).max(12) }))
+      .query(async ({ input, ctx }) => {
+        const artistIds = await verifyPortalToken(input.token, ctx.env);
+        const rows = await getPortalSettlement(artistIds, input.year, input.month, ctx.db);
+        const tips = await getTipsForPerformanceIds(rows.map((r: any) => r.id), ctx.db);
+        const defaultRateSetting = (await getSetting("settlement_default_rate", ctx.db)) ?? null;
+        return { rows, tips, defaultRateSetting };
       }),
   }),
 

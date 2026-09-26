@@ -6,52 +6,88 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import type { ComputedRow } from "@/components/SettlementTab";
-
-const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
+import { won } from "@/lib/settlement";
 
 const FULL_DATE = /(\d{4})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})\s*일?/;
 const SHORT_DATE = /(?<![\d.])(\d{1,2})\s*[.\-/월]\s*(\d{1,2})\s*일?(?![\d.])/;
-const TIME = /\d{1,2}:\d{2}(?::\d{2})?/g;
+const TIME = /(\d{1,2}):(\d{2})(?::(\d{2}))?/;
 const NUMBER = /-?\d[\d,]*(?:\.\d+)?/g;
+const NUMERIC_CELL = /^-?\d[\d,]*(?:\.\d+)?\s*원?$/;
+// 은행 내역에서 입금자명이 아닌 상투적 토큰
+const NOISE_TOKENS = new Set(["코드받기", "입금", "출금", "이체", "원", "님"]);
+
+const isNoise = (token: string) => /^\[.?\]$/.test(token) || NOISE_TOKENS.has(token);
 
 type ParsedLine = {
   raw: string;
   date: Date | null;
   numbers: number[];
+  depositor: string;
 };
 
 function parseLine(raw: string, defaultYear: number): ParsedLine {
-  let text = raw.replace(TIME, " ");
   let date: Date | null = null;
+  let time: { h: number; m: number; s: number } | null = null;
+  const cells = raw.includes("\t") ? raw.split("\t").map(c => c.trim()) : raw.split(/\s+/);
+  const numbers: number[] = [];
+  const textTokens: string[] = [];
 
-  const full = text.match(FULL_DATE);
-  if (full) {
-    date = new Date(Number(full[1]), Number(full[2]) - 1, Number(full[3]));
-    text = text.replace(full[0], " ");
-  } else {
-    const short = text.match(SHORT_DATE);
-    if (short) {
-      date = new Date(defaultYear, Number(short[1]) - 1, Number(short[2]));
-      text = text.replace(short[0], " ");
+  for (const cell of cells) {
+    if (!cell) continue;
+    let rest = cell;
+    if (!date) {
+      const full = rest.match(FULL_DATE);
+      if (full) {
+        date = new Date(Number(full[1]), Number(full[2]) - 1, Number(full[3]));
+        rest = rest.replace(full[0], " ");
+      } else {
+        const short = rest.match(SHORT_DATE);
+        if (short) {
+          date = new Date(defaultYear, Number(short[1]) - 1, Number(short[2]));
+          rest = rest.replace(short[0], " ");
+        }
+      }
     }
+    const t = rest.match(TIME);
+    if (t) {
+      if (!time) time = { h: Number(t[1]), m: Number(t[2]), s: Number(t[3] || 0) };
+      rest = rest.replace(t[0], " ");
+    }
+    rest = rest.trim();
+    if (!rest) continue;
+
+    if (NUMERIC_CELL.test(rest)) {
+      const n = Number(rest.replace(/[^\d.-]/g, ""));
+      if (Number.isFinite(n)) numbers.push(n);
+      continue;
+    }
+    const inline = rest.match(NUMBER);
+    if (inline && rest.replace(NUMBER, "").trim() === "") {
+      inline.forEach(tok => numbers.push(Number(tok.replace(/,/g, ""))));
+      continue;
+    }
+    const cleaned = rest.split(/\s+/).filter(tok => !isNoise(tok)).map(tok => tok.replace(/님$/, "")).join(" ").trim();
+    if (cleaned) textTokens.push(cleaned);
   }
+
   if (date && isNaN(date.getTime())) date = null;
+  if (date && time) date.setHours(time.h, time.m, time.s, 0);
 
-  const numbers = (text.match(NUMBER) || [])
-    .map(t => Number(t.replace(/,/g, "")))
-    .filter(n => Number.isFinite(n));
-
-  return { raw, date, numbers };
+  return { raw, date, numbers, depositor: textTokens.join(" ").trim() };
 }
+
+type TipDraft = { tippedAt: Date; amount: number; depositor: string };
 
 type PreviewEntry = {
   key: string;
   date: Date;
   amount: number;
-  lineCount: number;
+  tips: TipDraft[];
   status: "matched" | "ambiguous" | "none" | "other-month";
   candidates: ComputedRow[];
 };
+
+export type TipApplyEntry = { performanceId: number; tips: TipDraft[] };
 
 export function TipPasteDialog({
   open,
@@ -66,7 +102,7 @@ export function TipPasteDialog({
   rows: ComputedRow[];
   year: number;
   month: number;
-  onApply: (updates: { id: number; extraTip: number }[]) => Promise<void>;
+  onApply: (entries: TipApplyEntry[]) => Promise<void>;
 }) {
   const [text, setText] = useState("");
   const [amountIndex, setAmountIndex] = useState(0);
@@ -87,11 +123,12 @@ export function TipPasteDialog({
       if (!p.date) continue;
       const amount = p.numbers[amountIndex];
       if (amount == null) continue;
+      const tip: TipDraft = { tippedAt: p.date, amount, depositor: p.depositor };
       const key = format(p.date, "yyyy-MM-dd");
       const existing = map.get(key);
       if (existing) {
         existing.amount += amount;
-        existing.lineCount += 1;
+        existing.tips.push(tip);
         continue;
       }
       const inMonth = p.date.getFullYear() === year && p.date.getMonth() === month - 1;
@@ -100,7 +137,7 @@ export function TipPasteDialog({
         key,
         date: p.date,
         amount,
-        lineCount: 1,
+        tips: [tip],
         status: !inMonth ? "other-month" : candidates.length === 0 ? "none" : candidates.length === 1 ? "matched" : "ambiguous",
         candidates,
       });
@@ -108,13 +145,14 @@ export function TipPasteDialog({
     return Array.from(map.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [parsed, amountIndex, rows, year, month]);
 
-  const updates = entries.flatMap(e => {
-    if (e.status === "matched") return [{ id: e.candidates[0].id, extraTip: e.amount, entry: e }];
-    if (e.status === "ambiguous" && choices[e.key]) return [{ id: choices[e.key], extraTip: e.amount, entry: e }];
+  const updates: (TipApplyEntry & { entry: PreviewEntry })[] = entries.flatMap(e => {
+    if (e.status === "matched") return [{ performanceId: e.candidates[0].id, tips: e.tips, entry: e }];
+    if (e.status === "ambiguous" && choices[e.key]) return [{ performanceId: choices[e.key], tips: e.tips, entry: e }];
     return [];
   });
-  const applyTotal = updates.reduce((s, u) => s + u.extraTip, 0);
+  const applyTotal = updates.reduce((s, u) => s + u.entry.amount, 0);
   const pendingChoices = entries.filter(e => e.status === "ambiguous" && !choices[e.key]).length;
+  const hasDepositors = parsed.some(p => p.date && p.depositor);
 
   const reset = () => {
     setText("");
@@ -144,18 +182,18 @@ export function TipPasteDialog({
         <div className="flex-1 overflow-y-auto space-y-4 pt-2 pr-1">
           <div className="space-y-1.5">
             <Label className="text-[11px] font-black text-slate-500">
-              엑셀에서 날짜·금액이 있는 범위를 복사한 뒤 아래에 붙여넣으세요
+              엑셀에서 날짜·입금자·금액이 있는 범위를 복사한 뒤 아래에 붙여넣으세요
             </Label>
             <textarea
               autoFocus
               className="w-full min-h-[140px] p-3 text-xs font-mono bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 resize-y placeholder:text-slate-400"
-              placeholder={"2026-09-10\t50,000\n2026-09-13\t30,000\n9/15\t20,000"}
+              placeholder={"2026-09-10 20:29:13\t[+] 코드받기\t홍길동\t50,000\t19,510\n2026-09-13 21:02:11\t[+] 코드받기\t김철수\t30,000\t49,510"}
               value={text}
               onChange={e => setText(e.target.value)}
             />
             <p className="text-[10px] font-medium text-slate-400">
-              같은 날짜는 합산되고, 해당 날짜 공연의 "추가 팁"에 <span className="font-black text-slate-500">덮어쓰기</span>됩니다.
-              날짜 형식은 2026-09-10 · 2026.09.10 · 9/10 · 9월 10일 모두 인식합니다.
+              같은 날짜는 합산되어 해당 공연의 "추가 팁"에 <span className="font-black text-slate-500">덮어쓰기</span>되고, 입금자별 내역이 함께 저장됩니다.
+              날짜·시간·잔액 등은 자동으로 구분합니다.
             </p>
           </div>
 
@@ -186,32 +224,47 @@ export function TipPasteDialog({
               <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 overflow-hidden">
                 {entries.map(e => {
                   const target = e.status === "matched" ? e.candidates[0] : e.candidates.find(c => c.id === choices[e.key]);
+                  const muted = e.status === "none" || e.status === "other-month";
                   return (
-                    <div key={e.key} className={`p-3 flex flex-wrap items-center gap-x-3 gap-y-1 ${e.status === "none" || e.status === "other-month" ? "bg-slate-50/60" : "bg-white"}`}>
-                      <span className="text-sm font-black text-slate-800 min-w-[72px]">{format(e.date, "M/d (EEE)", { locale: ko })}</span>
-                      <span className="text-sm font-black text-indigo-600 min-w-[80px] text-right">{won(e.amount)}</span>
-                      {e.lineCount > 1 && <span className="text-[9px] font-bold text-slate-400">{e.lineCount}건 합산</span>}
-                      <div className="flex-1 min-w-[140px] flex items-center gap-2">
-                        {e.status === "ambiguous" ? (
-                          <select
-                            className="h-8 rounded-lg border border-amber-300 bg-amber-50 px-2 text-xs font-bold"
-                            value={choices[e.key] || ""}
-                            onChange={ev => setChoices({ ...choices, [e.key]: Number(ev.target.value) })}
-                          >
-                            <option value="">팀 선택…</option>
-                            {e.candidates.map(c => <option key={c.id} value={c.id}>{c.artistName}</option>)}
-                          </select>
-                        ) : statusBadge(e)}
-                        {target && target.extraTip !== e.amount && (
-                          <span className="text-[10px] font-bold text-slate-400">
-                            기존 {target.extraTip.toLocaleString("ko-KR")} → {e.amount.toLocaleString("ko-KR")}
-                          </span>
-                        )}
+                    <div key={e.key} className={`p-3 space-y-1 ${muted ? "bg-slate-50/60" : "bg-white"}`}>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="text-sm font-black text-slate-800 min-w-[72px]">{format(e.date, "M/d (EEE)", { locale: ko })}</span>
+                        <span className="text-sm font-black text-indigo-600 min-w-[80px] text-right">{won(e.amount)}</span>
+                        {e.tips.length > 1 && <span className="text-[9px] font-bold text-slate-400">{e.tips.length}건 합산</span>}
+                        <div className="flex-1 min-w-[140px] flex items-center gap-2">
+                          {e.status === "ambiguous" ? (
+                            <select
+                              className="h-8 rounded-lg border border-amber-300 bg-amber-50 px-2 text-xs font-bold"
+                              value={choices[e.key] || ""}
+                              onChange={ev => setChoices({ ...choices, [e.key]: Number(ev.target.value) })}
+                            >
+                              <option value="">팀 선택…</option>
+                              {e.candidates.map(c => <option key={c.id} value={c.id}>{c.artistName}</option>)}
+                            </select>
+                          ) : statusBadge(e)}
+                          {target && target.extraTip !== e.amount && (
+                            <span className="text-[10px] font-bold text-slate-400">
+                              기존 {target.extraTip.toLocaleString("ko-KR")} → {e.amount.toLocaleString("ko-KR")}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      {!muted && (
+                        <p className="pl-1 text-[10px] font-medium text-slate-500 leading-relaxed">
+                          {e.tips.map((t, i) => (
+                            <span key={i} className="inline-block mr-2">
+                              <span className={t.depositor ? "font-bold text-slate-700" : "text-slate-400"}>{t.depositor || "무기명"}</span> {t.amount.toLocaleString("ko-KR")}
+                            </span>
+                          ))}
+                        </p>
+                      )}
                     </div>
                   );
                 })}
               </div>
+              {!hasDepositors && (
+                <p className="px-1 text-[10px] font-bold text-amber-600">입금자명이 인식되지 않았습니다. 입금자 열까지 포함해서 복사했는지 확인해주세요. (없어도 금액은 반영됩니다)</p>
+              )}
             </div>
           )}
 
@@ -239,7 +292,7 @@ export function TipPasteDialog({
             onClick={async () => {
               setIsApplying(true);
               try {
-                await onApply(updates.map(({ id, extraTip }) => ({ id, extraTip })));
+                await onApply(updates.map(({ performanceId, tips }) => ({ performanceId, tips })));
                 reset();
                 onOpenChange(false);
               } finally {

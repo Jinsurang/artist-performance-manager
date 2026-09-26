@@ -1,7 +1,7 @@
 import { eq, sql, and, gte, lte, ne, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { InsertUser, users, artists, performances, notices, InsertArtist, InsertPerformance, InsertNotice, settings } from "../drizzle/schema";
+import { InsertUser, users, artists, performances, notices, InsertArtist, InsertPerformance, InsertNotice, settings, performanceTips, portalLoginAttempts } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 // Safe access to process.env (may not exist in Cloudflare Workers)
@@ -24,6 +24,22 @@ function ensureSchema(sqlClient: ReturnType<typeof postgres>) {
       await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS extra_tip INTEGER DEFAULT 0 NOT NULL`;
       await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP`;
       await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS set_count INTEGER`;
+      await sqlClient`CREATE TABLE IF NOT EXISTS performance_tips (
+        id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+        performance_id INTEGER NOT NULL REFERENCES performances(id) ON DELETE CASCADE,
+        tipped_at TIMESTAMP NOT NULL,
+        amount INTEGER NOT NULL,
+        depositor VARCHAR(100),
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )`;
+      await sqlClient`CREATE INDEX IF NOT EXISTS performance_tips_performance_id_idx ON performance_tips(performance_id)`;
+      await sqlClient`CREATE TABLE IF NOT EXISTS portal_login_attempts (
+        id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+        name_key VARCHAR(100) NOT NULL,
+        success BOOLEAN NOT NULL DEFAULT FALSE,
+        attempted_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )`;
+      await sqlClient`CREATE INDEX IF NOT EXISTS portal_login_attempts_name_key_idx ON portal_login_attempts(name_key, attempted_at)`;
     })().catch(error => {
       console.error("[Database] Schema ensure failed:", error);
       _schemaReady = null;
@@ -403,7 +419,120 @@ export async function updateSettlement(
 ) {
   const db = dbInstance || await getDb();
   if (!db) throw new Error("Database not available");
+  // 팁 합계를 직접 고치면 붙여넣기로 들어온 개별 내역과 어긋나므로 내역을 비운다
+  if (data.extraTip !== undefined) {
+    await db.delete(performanceTips).where(eq(performanceTips.performanceId, id));
+  }
   return await db.update(performances).set({ ...data, updatedAt: new Date() }).where(eq(performances.id, id));
+}
+
+export type TipInput = { tippedAt: Date; amount: number; depositor?: string | null };
+
+export async function replacePerformanceTips(performanceId: number, tips: TipInput[], dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(performanceTips).where(eq(performanceTips.performanceId, performanceId));
+  if (tips.length > 0) {
+    await db.insert(performanceTips).values(
+      tips.map(t => ({ performanceId, tippedAt: t.tippedAt, amount: t.amount, depositor: t.depositor?.trim() || null }))
+    );
+  }
+  const total = tips.reduce((s, t) => s + t.amount, 0);
+  await db.update(performances).set({ extraTip: total, updatedAt: new Date() }).where(eq(performances.id, performanceId));
+}
+
+const tipColumns = {
+  id: performanceTips.id,
+  performanceId: performanceTips.performanceId,
+  tippedAt: performanceTips.tippedAt,
+  amount: performanceTips.amount,
+  depositor: performanceTips.depositor,
+};
+
+export async function getTipsForMonth(year: number, month: number, dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db) return [];
+  const startDate = new Date(year, month - 1, 0, 0, 0, 0);
+  const endDate = new Date(year, month, 1, 23, 59, 59);
+  return await db.select(tipColumns)
+    .from(performanceTips)
+    .innerJoin(performances, eq(performanceTips.performanceId, performances.id))
+    .where(and(
+      gte(performances.performanceDate, startDate),
+      lte(performances.performanceDate, endDate)
+    ))
+    .orderBy(performanceTips.tippedAt);
+}
+
+export async function getTipsForPerformanceIds(ids: number[], dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db || ids.length === 0) return [];
+  return await db.select(tipColumns)
+    .from(performanceTips)
+    .where(inArray(performanceTips.performanceId, ids))
+    .orderBy(performanceTips.tippedAt);
+}
+
+/**
+ * Artist portal - 아티스트 본인 정산 조회 (담당자 실명 + 연락처 뒷 4자리)
+ */
+export async function findArtistsForPortal(realName: string, phoneLast4: string, dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db) return [];
+  const nameKey = realName.trim().toLowerCase();
+  return await db.select({ id: artists.id, name: artists.name, realName: artists.realName })
+    .from(artists)
+    .where(sql`lower(trim(coalesce(${artists.realName}, ''))) = ${nameKey}
+      AND right(regexp_replace(coalesce(${artists.phone}, ''), '\\D', '', 'g'), 4) = ${phoneLast4}`)
+    .orderBy(artists.name);
+}
+
+export async function countRecentPortalFailures(nameKey: string, windowMinutes: number, dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db) return 0;
+  const since = new Date(Date.now() - windowMinutes * 60 * 1000);
+  const result = await db.select({ count: sql<number>`count(*)` })
+    .from(portalLoginAttempts)
+    .where(and(
+      eq(portalLoginAttempts.nameKey, nameKey),
+      eq(portalLoginAttempts.success, false),
+      gte(portalLoginAttempts.attemptedAt, since)
+    ));
+  return Number(result[0]?.count ?? 0);
+}
+
+export async function recordPortalAttempt(nameKey: string, success: boolean, dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db) return;
+  await db.insert(portalLoginAttempts).values({ nameKey, success });
+}
+
+export async function getPortalSettlement(artistIds: number[], year: number, month: number, dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db || artistIds.length === 0) return [];
+  const startDate = new Date(year, month - 1, 0, 0, 0, 0);
+  const endDate = new Date(year, month, 1, 23, 59, 59);
+  return await db.select({
+    id: performances.id,
+    artistId: performances.artistId,
+    artistName: artists.name,
+    artistMemberCount: artists.memberCount,
+    performanceDate: performances.performanceDate,
+    actualMemberCount: performances.actualMemberCount,
+    perPersonRate: performances.perPersonRate,
+    extraTip: performances.extraTip,
+    setCount: performances.setCount,
+    paidAt: performances.paidAt,
+  })
+    .from(performances)
+    .leftJoin(artists, eq(performances.artistId, artists.id))
+    .where(and(
+      inArray(performances.artistId, artistIds),
+      gte(performances.performanceDate, startDate),
+      lte(performances.performanceDate, endDate),
+      inArray(performances.status, [...SETTLEMENT_STATUSES])
+    ))
+    .orderBy(performances.performanceDate);
 }
 
 export async function setSettlementPaid(ids: number[], paid: boolean, dbInstance?: any) {

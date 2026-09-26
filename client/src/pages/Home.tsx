@@ -642,9 +642,14 @@ export default function Home() {
               <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-bold border-red-100 text-red-600 hover:bg-red-50" onClick={handleAdminLogout}>로그아웃</Button>
             </div>
           ) : (
-            <Button variant="ghost" size="sm" className="h-8 text-slate-400 font-bold text-[10px] uppercase tracking-widest" onClick={() => setIsLoginOpen(true)}>
-              <Lock className="h-3 w-3 mr-1" /> Admin
-            </Button>
+            <div className="flex items-center gap-1">
+              <a href="/my" className="h-8 px-3 inline-flex items-center rounded-lg text-[11px] font-black text-primary hover:bg-primary/5 transition-colors">
+                정산내역 조회
+              </a>
+              <Button variant="ghost" size="sm" className="h-8 text-slate-400 font-bold text-[10px] uppercase tracking-widest" onClick={() => setIsLoginOpen(true)}>
+                <Lock className="h-3 w-3 mr-1" /> Admin
+              </Button>
+            </div>
           )}
         </div>
       </header>
@@ -892,6 +897,16 @@ export default function Home() {
                 )}
               </div>
             </div>
+
+            <a href="/my" className="block rounded-2xl border border-slate-200 bg-white p-4 hover:border-primary/40 hover:bg-primary/5 transition-colors">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-slate-800">이미 공연하셨나요? 정산내역 조회</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">담당자 실명과 연락처 뒷 4자리로 월별 공연비·팁 내역을 확인할 수 있습니다.</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-slate-300 shrink-0" />
+              </div>
+            </a>
           </>
         ) : (
           /* Admin View */

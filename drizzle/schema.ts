@@ -73,6 +73,31 @@ export type Performance = typeof performances.$inferSelect;
 export type InsertPerformance = typeof performances.$inferInsert;
 
 /**
+ * Performance tips - 공연별 팁 입금 내역 (입금자명 포함). extra_tip은 이 합계로 갱신된다.
+ */
+export const performanceTips = pgTable("performance_tips", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  performanceId: integer("performance_id").notNull().references(() => performances.id, { onDelete: "cascade" }),
+  tippedAt: timestamp("tipped_at").notNull(),
+  amount: integer("amount").notNull(),
+  depositor: varchar("depositor", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type PerformanceTip = typeof performanceTips.$inferSelect;
+export type InsertPerformanceTip = typeof performanceTips.$inferInsert;
+
+/**
+ * Portal login attempts - 아티스트 정산 조회 로그인 시도 (잠금 판단용)
+ */
+export const portalLoginAttempts = pgTable("portal_login_attempts", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  nameKey: varchar("name_key", { length: 100 }).notNull(),
+  success: boolean("success").default(false).notNull(),
+  attemptedAt: timestamp("attempted_at").defaultNow().notNull(),
+});
+
+/**
  * Notice table - 공지 메시지 관리
  */
 export const notices = pgTable("notices", {
