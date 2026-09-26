@@ -297,7 +297,7 @@ export default function ArtistPortal() {
                               <ul className="mt-1 space-y-0.5">
                                 {r.tips.map(t => (
                                   <li key={t.id} className="text-[11px] text-slate-500">
-                                    <span className="text-slate-400 tabular-nums mr-1.5">{tipTime(t)}</span>
+                                    <span className="font-bold text-slate-600 tabular-nums mr-1.5">{tipTime(t)}</span>
                                     <span className={t.depositor ? "font-bold text-slate-700" : "text-slate-400"}>{t.depositor || "무기명"}</span>
                                     <span className="ml-1.5 tabular-nums">{t.amount.toLocaleString("ko-KR")}</span>
                                   </li>

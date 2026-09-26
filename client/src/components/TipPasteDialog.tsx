@@ -255,7 +255,7 @@ export function TipPasteDialog({
                         <p className="pl-1 text-[10px] font-medium text-slate-500 leading-relaxed">
                           {e.tips.map((t, i) => (
                             <span key={i} className="inline-block mr-2.5">
-                              <span className="text-slate-400 tabular-nums">{format(t.tippedAt, "HH:mm")}</span>{" "}
+                              <span className="font-bold text-slate-600 tabular-nums">{format(t.tippedAt, "HH:mm")}</span>{" "}
                               <span className={t.depositor ? "font-bold text-slate-700" : "text-slate-400"}>{t.depositor || "무기명"}</span> {t.amount.toLocaleString("ko-KR")}
                             </span>
                           ))}

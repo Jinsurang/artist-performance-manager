@@ -549,7 +549,7 @@ export function SettlementTab() {
                           <p className="text-[10px] font-medium text-slate-500 leading-snug">
                             {row.tips.map(t => (
                               <span key={t.id} className="inline-block mr-2 whitespace-nowrap">
-                                <span className="text-slate-400 tabular-nums">{tipTime(t)}</span>{" "}
+                                <span className="font-bold text-slate-600 tabular-nums">{tipTime(t)}</span>{" "}
                                 <span className={t.depositor ? "font-bold text-slate-700" : "text-slate-400"}>{t.depositor || "무기명"}</span> {t.amount.toLocaleString("ko-KR")}
                               </span>
                             ))}
