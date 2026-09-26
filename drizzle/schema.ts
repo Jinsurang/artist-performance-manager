@@ -81,6 +81,8 @@ export const performanceTips = pgTable("performance_tips", {
   tippedAt: timestamp("tipped_at").notNull(),
   amount: integer("amount").notNull(),
   depositor: varchar("depositor", { length: 100 }),
+  // 관리자가 합계를 직접 고쳐서 생긴 조정 항목 (현금 팁 등)
+  isManual: boolean("is_manual").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

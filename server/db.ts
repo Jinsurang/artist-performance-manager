@@ -33,6 +33,7 @@ function ensureSchema(sqlClient: ReturnType<typeof postgres>) {
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
       )`;
       await sqlClient`CREATE INDEX IF NOT EXISTS performance_tips_performance_id_idx ON performance_tips(performance_id)`;
+      await sqlClient`ALTER TABLE performance_tips ADD COLUMN IF NOT EXISTS is_manual BOOLEAN NOT NULL DEFAULT FALSE`;
       await sqlClient`CREATE TABLE IF NOT EXISTS portal_login_attempts (
         id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
         name_key VARCHAR(100) NOT NULL,
@@ -419,27 +420,16 @@ export async function updateSettlement(
 ) {
   const db = dbInstance || await getDb();
   if (!db) throw new Error("Database not available");
-  // 팁 합계를 직접 고치면 붙여넣기로 들어온 개별 내역과 어긋나므로 내역을 비운다
-  if (data.extraTip !== undefined) {
-    await db.delete(performanceTips).where(eq(performanceTips.performanceId, id));
+  const { extraTip, ...rest } = data;
+  // 합계를 직접 고치면 붙여넣은 내역은 그대로 두고 차액만 "직접 입력" 항목으로 보존한다
+  if (extraTip !== undefined) {
+    await setManualTipTotal(id, extraTip, db);
   }
-  return await db.update(performances).set({ ...data, updatedAt: new Date() }).where(eq(performances.id, id));
+  if (Object.keys(rest).length === 0) return;
+  return await db.update(performances).set({ ...rest, updatedAt: new Date() }).where(eq(performances.id, id));
 }
 
 export type TipInput = { tippedAt: Date; amount: number; depositor?: string | null };
-
-export async function replacePerformanceTips(performanceId: number, tips: TipInput[], dbInstance?: any) {
-  const db = dbInstance || await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.delete(performanceTips).where(eq(performanceTips.performanceId, performanceId));
-  if (tips.length > 0) {
-    await db.insert(performanceTips).values(
-      tips.map(t => ({ performanceId, tippedAt: t.tippedAt, amount: t.amount, depositor: t.depositor?.trim() || null }))
-    );
-  }
-  const total = tips.reduce((s, t) => s + t.amount, 0);
-  await db.update(performances).set({ extraTip: total, updatedAt: new Date() }).where(eq(performances.id, performanceId));
-}
 
 const tipColumns = {
   id: performanceTips.id,
@@ -447,7 +437,73 @@ const tipColumns = {
   tippedAt: performanceTips.tippedAt,
   amount: performanceTips.amount,
   depositor: performanceTips.depositor,
+  isManual: performanceTips.isManual,
 };
+
+const tipKey = (t: { tippedAt: Date | string; amount: number; depositor?: string | null }) =>
+  `${new Date(t.tippedAt).getTime()}|${t.amount}|${(t.depositor || "").trim()}`;
+
+async function recomputeExtraTip(performanceId: number, db: any) {
+  const [row] = await db.select({ total: sql<number>`coalesce(sum(${performanceTips.amount}), 0)` })
+    .from(performanceTips)
+    .where(eq(performanceTips.performanceId, performanceId));
+  await db.update(performances)
+    .set({ extraTip: Number(row?.total ?? 0), updatedAt: new Date() })
+    .where(eq(performances.id, performanceId));
+}
+
+// 붙여넣은 내역 중 이미 있는 것(같은 시각·금액·송금자)은 건너뛰고 새 것만 추가한다
+export async function mergePerformanceTips(performanceId: number, tips: TipInput[], dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await db.select(tipColumns).from(performanceTips).where(eq(performanceTips.performanceId, performanceId));
+  const seen = new Set(existing.map(tipKey));
+  const fresh = tips.filter(t => {
+    const key = tipKey(t);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (fresh.length > 0) {
+    await db.insert(performanceTips).values(
+      fresh.map(t => ({ performanceId, tippedAt: t.tippedAt, amount: t.amount, depositor: t.depositor?.trim() || null, isManual: false }))
+    );
+  }
+  await recomputeExtraTip(performanceId, db);
+  return { added: fresh.length, skipped: tips.length - fresh.length };
+}
+
+export async function setManualTipTotal(performanceId: number, total: number, dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db) throw new Error("Database not available");
+  const perf = await getPerformanceById(performanceId, db);
+  if (!perf) throw new Error("Performance not found");
+  const [row] = await db.select({ total: sql<number>`coalesce(sum(${performanceTips.amount}), 0)` })
+    .from(performanceTips)
+    .where(and(eq(performanceTips.performanceId, performanceId), eq(performanceTips.isManual, false)));
+  const pastedSum = Number(row?.total ?? 0);
+  await db.delete(performanceTips).where(and(eq(performanceTips.performanceId, performanceId), eq(performanceTips.isManual, true)));
+  const adjustment = total - pastedSum;
+  if (adjustment !== 0) {
+    await db.insert(performanceTips).values({
+      performanceId,
+      tippedAt: perf.performanceDate,
+      amount: adjustment,
+      depositor: null,
+      isManual: true,
+    });
+  }
+  await recomputeExtraTip(performanceId, db);
+}
+
+export async function deletePerformanceTip(tipId: number, dbInstance?: any) {
+  const db = dbInstance || await getDb();
+  if (!db) throw new Error("Database not available");
+  const [tip] = await db.select(tipColumns).from(performanceTips).where(eq(performanceTips.id, tipId)).limit(1);
+  if (!tip) return;
+  await db.delete(performanceTips).where(eq(performanceTips.id, tipId));
+  await recomputeExtraTip(tip.performanceId, db);
+}
 
 export async function getTipsForMonth(year: number, month: number, dbInstance?: any) {
   const db = dbInstance || await getDb();

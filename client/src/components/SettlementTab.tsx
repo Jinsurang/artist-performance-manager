@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns";
 import { ko } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, AlertTriangle, Users, CalendarDays, Wallet, Banknote, Download, CheckCircle2, Clock, ClipboardPaste } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, AlertTriangle, Users, CalendarDays, Wallet, Banknote, Download, CheckCircle2, Clock, ClipboardPaste, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 import { TipPasteDialog } from "@/components/TipPasteDialog";
-import { DEFAULT_RATE_FALLBACK, won, computeSettlement, tipSummary, tipTime, type SettlementAmounts, type TipEntry } from "@/lib/settlement";
+import { DEFAULT_RATE_FALLBACK, won, computeSettlement, tipSummary, tipTime, tipName, sortTips, type SettlementAmounts, type TipEntry } from "@/lib/settlement";
 
 const DEFAULT_RATE_KEY = "settlement_default_rate";
 const HEADER_DAYS = ["월", "화", "수", "목", "금", "토", "일"];
@@ -178,6 +178,7 @@ export function SettlementTab() {
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const [isExporting, setIsExporting] = useState(false);
   const [isTipPasteOpen, setIsTipPasteOpen] = useState(false);
+  const [expandedTips, setExpandedTips] = useState<Record<number, boolean>>({});
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth() + 1;
 
@@ -207,6 +208,11 @@ export function SettlementTab() {
 
   const applyTips = trpc.settlement.applyTips.useMutation({
     onSuccess: invalidateMonth,
+  });
+
+  const deleteTip = trpc.settlement.deleteTip.useMutation({
+    onSuccess: invalidateMonth,
+    onError: () => toast.error("팁 삭제 실패"),
   });
 
   const setPaid = trpc.settlement.setPaid.useMutation({
@@ -299,8 +305,12 @@ export function SettlementTab() {
         month={month}
         onApply={async entries => {
           try {
-            await applyTips.mutateAsync({ entries });
-            toast.success(`${entries.length}건의 팁을 입력했습니다.`);
+            const result = await applyTips.mutateAsync({ entries });
+            toast.success(
+              result.added > 0
+                ? `팁 ${result.added}건을 추가했습니다.${result.skipped > 0 ? ` (이미 등록된 ${result.skipped}건은 건너뜀)` : ""}`
+                : "새로 추가된 팁이 없습니다. 모두 이미 등록된 내역입니다."
+            );
           } catch (e) {
             console.error("[Settlement] Tip paste apply failed:", e);
             toast.error("팁 입력에 실패했습니다. 목록을 확인해주세요.");
@@ -518,6 +528,16 @@ export function SettlementTab() {
                           />
                           <span className={`text-[10px] font-black ${row.sets === 2 ? "text-indigo-600" : "text-slate-400"}`}>2부 (수당 ×2)</span>
                         </label>
+                        {row.tips.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedTips(prev => ({ ...prev, [row.id]: !prev[row.id] }))}
+                            className="mt-1 flex items-center gap-1 text-[10px] font-black text-indigo-600 hover:underline"
+                          >
+                            <ChevronDown className={`h-3 w-3 transition-transform ${expandedTips[row.id] ? "rotate-180" : ""}`} />
+                            팁 {row.tips.length}건 {expandedTips[row.id] ? "접기" : "보기"}
+                          </button>
+                        )}
                       </div>
                       <div className="space-y-1">
                         <Label className="text-[9px] font-black text-slate-400 uppercase">실제 인원</Label>
@@ -545,16 +565,6 @@ export function SettlementTab() {
                           suffix="원"
                           onCommit={next => updateSettlement.mutate({ id: row.id, extraTip: next ?? 0 })}
                         />
-                        {row.tips.length > 0 && (
-                          <p className="text-[10px] font-medium text-slate-500 leading-snug">
-                            {row.tips.map(t => (
-                              <span key={t.id} className="inline-block mr-2 whitespace-nowrap">
-                                <span className="font-bold text-slate-600 tabular-nums">{tipTime(t)}</span>{" "}
-                                <span className={t.depositor ? "font-bold text-slate-700" : "text-slate-400"}>{t.depositor || "무기명"}</span> {t.amount.toLocaleString("ko-KR")}
-                              </span>
-                            ))}
-                          </p>
-                        )}
                       </div>
                       <div className="text-right sm:min-w-[120px]">
                         <p className="text-[10px] font-bold text-slate-400">
@@ -563,6 +573,31 @@ export function SettlementTab() {
                         <p className="text-[11px] font-bold text-slate-500">세전 {won(row.pre)}</p>
                         <p className="text-sm font-black text-slate-800">세후 {won(row.post)}</p>
                       </div>
+
+                      {expandedTips[row.id] && row.tips.length > 0 && (
+                        <div className="col-span-2 sm:col-span-5 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
+                          <ul className="flex flex-wrap gap-x-4 gap-y-1.5">
+                            {sortTips(row.tips).map(t => (
+                              <li key={t.id} className="flex items-center gap-1.5 text-[11px] leading-none">
+                                {tipTime(t) && <span className="font-bold text-slate-600 tabular-nums">{tipTime(t)}</span>}
+                                <span className={t.isManual ? "font-bold text-amber-700" : t.depositor ? "font-bold text-slate-800" : "text-slate-400"}>{tipName(t)}</span>
+                                <span className="tabular-nums text-slate-600">{t.amount.toLocaleString("ko-KR")}</span>
+                                <button
+                                  type="button"
+                                  title="이 팁 삭제"
+                                  disabled={deleteTip.isPending}
+                                  onClick={() => {
+                                    if (confirm(`${tipName(t)} ${t.amount.toLocaleString("ko-KR")}원 팁을 삭제할까요?`)) deleteTip.mutate({ id: t.id });
+                                  }}
+                                  className="text-slate-300 hover:text-red-500 transition-colors"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

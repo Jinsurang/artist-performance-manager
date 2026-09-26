@@ -80,6 +80,15 @@ function parseLine(raw: string, defaultYear: number): ParsedLine {
 
 type TipDraft = { tippedAt: Date; amount: number; depositor: string };
 
+// 서버와 같은 기준으로 이미 등록된 내역인지 판단한다 (시각·금액·송금자)
+const tipKey = (t: { tippedAt: Date | string; amount: number; depositor?: string | null }) =>
+  `${new Date(t.tippedAt).getTime()}|${t.amount}|${(t.depositor || "").trim()}`;
+
+const newTipsFor = (tips: TipDraft[], target: ComputedRow | undefined) => {
+  const existing = new Set((target?.tips || []).filter(t => !t.isManual).map(tipKey));
+  return tips.filter(t => !existing.has(tipKey(t)));
+};
+
 type PreviewEntry = {
   key: string;
   date: Date;
@@ -147,12 +156,14 @@ export function TipPasteDialog({
     return Array.from(map.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [parsed, amountIndex, rows, year, month]);
 
-  const updates: (TipApplyEntry & { entry: PreviewEntry })[] = entries.flatMap(e => {
-    if (e.status === "matched") return [{ performanceId: e.candidates[0].id, tips: e.tips, entry: e }];
-    if (e.status === "ambiguous" && choices[e.key]) return [{ performanceId: choices[e.key], tips: e.tips, entry: e }];
-    return [];
+  const updates: (TipApplyEntry & { entry: PreviewEntry; newAmount: number; newCount: number })[] = entries.flatMap(e => {
+    const target = e.status === "matched" ? e.candidates[0] : e.status === "ambiguous" ? e.candidates.find(c => c.id === choices[e.key]) : undefined;
+    if (!target) return [];
+    const fresh = newTipsFor(e.tips, target);
+    return [{ performanceId: target.id, tips: e.tips, entry: e, newAmount: fresh.reduce((s, t) => s + t.amount, 0), newCount: fresh.length }];
   });
-  const applyTotal = updates.reduce((s, u) => s + u.entry.amount, 0);
+  const applyTotal = updates.reduce((s, u) => s + u.newAmount, 0);
+  const applyCount = updates.reduce((s, u) => s + u.newCount, 0);
   const pendingChoices = entries.filter(e => e.status === "ambiguous" && !choices[e.key]).length;
   const hasDepositors = parsed.some(p => p.date && p.depositor);
 
@@ -194,8 +205,8 @@ export function TipPasteDialog({
               onChange={e => setText(e.target.value)}
             />
             <p className="text-[10px] font-medium text-slate-400">
-              같은 날짜는 합산되어 해당 공연의 "추가 팁"에 <span className="font-black text-slate-500">덮어쓰기</span>되고, 입금자별 내역이 함께 저장됩니다.
-              날짜·시간·잔액 등은 자동으로 구분합니다.
+              해당 날짜 공연에 송금자별 내역이 <span className="font-black text-slate-500">추가</span>됩니다.
+              같은 내역(시각·금액·송금자)은 중복 저장되지 않으니 같은 시트를 여러 번 붙여넣어도 안전하고, 직접 입력한 금액도 유지됩니다.
             </p>
           </div>
 
@@ -220,13 +231,16 @@ export function TipPasteDialog({
               <div className="flex items-center justify-between px-1">
                 <Label className="text-[11px] font-black text-slate-500">미리보기 · {entries.length}일</Label>
                 <span className="text-[11px] font-bold text-slate-500">
-                  반영 <span className="text-indigo-600">{updates.length}건 · {won(applyTotal)}</span>
+                  신규 추가 <span className="text-indigo-600">{applyCount}건 · {won(applyTotal)}</span>
                 </span>
               </div>
               <div className="divide-y divide-slate-100 rounded-2xl border border-slate-200 overflow-hidden">
                 {entries.map(e => {
                   const target = e.status === "matched" ? e.candidates[0] : e.candidates.find(c => c.id === choices[e.key]);
                   const muted = e.status === "none" || e.status === "other-month";
+                  const existingKeys = new Set((target?.tips || []).filter(t => !t.isManual).map(tipKey));
+                  const newAmount = e.tips.filter(t => !existingKeys.has(tipKey(t))).reduce((s, t) => s + t.amount, 0);
+                  const dupCount = e.tips.length - e.tips.filter(t => !existingKeys.has(tipKey(t))).length;
                   return (
                     <div key={e.key} className={`p-3 space-y-1 ${muted ? "bg-slate-50/60" : "bg-white"}`}>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -244,21 +258,27 @@ export function TipPasteDialog({
                               {e.candidates.map(c => <option key={c.id} value={c.id}>{c.artistName}</option>)}
                             </select>
                           ) : statusBadge(e)}
-                          {target && target.extraTip !== e.amount && (
+                          {target && (
                             <span className="text-[10px] font-bold text-slate-400">
-                              기존 {target.extraTip.toLocaleString("ko-KR")} → {e.amount.toLocaleString("ko-KR")}
+                              {dupCount > 0 && <span className="mr-1.5">등록됨 {dupCount}건 제외</span>}
+                              {target.extraTip > 0 || newAmount !== e.amount
+                                ? `기존 ${target.extraTip.toLocaleString("ko-KR")} + 신규 ${newAmount.toLocaleString("ko-KR")} = ${(target.extraTip + newAmount).toLocaleString("ko-KR")}`
+                                : null}
                             </span>
                           )}
                         </div>
                       </div>
                       {!muted && (
                         <p className="pl-1 text-[10px] font-medium text-slate-500 leading-relaxed">
-                          {e.tips.map((t, i) => (
-                            <span key={i} className="inline-block mr-2.5">
-                              <span className="font-bold text-slate-600 tabular-nums">{format(t.tippedAt, "HH:mm")}</span>{" "}
-                              <span className={t.depositor ? "font-bold text-slate-700" : "text-slate-400"}>{t.depositor || "무기명"}</span> {t.amount.toLocaleString("ko-KR")}
-                            </span>
-                          ))}
+                          {e.tips.map((t, i) => {
+                            const dup = existingKeys.has(tipKey(t));
+                            return (
+                              <span key={i} className={`inline-block mr-2.5 ${dup ? "line-through text-slate-300" : ""}`}>
+                                <span className={`tabular-nums ${dup ? "" : "font-bold text-slate-600"}`}>{format(t.tippedAt, "HH:mm")}</span>{" "}
+                                <span className={dup ? "" : t.depositor ? "font-bold text-slate-700" : "text-slate-400"}>{t.depositor || "무기명"}</span> {t.amount.toLocaleString("ko-KR")}
+                              </span>
+                            );
+                          })}
                         </p>
                       )}
                     </div>
@@ -291,7 +311,7 @@ export function TipPasteDialog({
           </Button>
           <Button
             className="flex-1 h-11 rounded-xl font-black text-sm bg-indigo-600 hover:bg-indigo-700 gap-1.5"
-            disabled={updates.length === 0 || isApplying}
+            disabled={applyCount === 0 || isApplying}
             onClick={async () => {
               setIsApplying(true);
               try {
@@ -304,7 +324,7 @@ export function TipPasteDialog({
             }}
           >
             <CheckCircle2 className="h-4 w-4" />
-            {updates.length}건 반영{pendingChoices > 0 ? ` (${pendingChoices}건 선택 대기)` : ""}
+            {applyCount}건 추가{pendingChoices > 0 ? ` (${pendingChoices}일 팀 선택 대기)` : ""}
           </Button>
         </div>
       </DialogContent>

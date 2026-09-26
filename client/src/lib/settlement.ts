@@ -44,10 +44,20 @@ export type TipEntry = {
   tippedAt: Date | string;
   amount: number;
   depositor: string | null;
+  isManual: boolean;
 };
 
-// 입금 시각으로 1부/2부를 구분할 수 있게 시:분을 함께 표기
-export const tipTime = (t: TipEntry) => format(new Date(t.tippedAt), "HH:mm");
+export const MANUAL_TIP_LABEL = "직접 입력";
+
+// 입금 시각을 함께 보여 아티스트가 시간대를 판단할 수 있게 한다. 직접 입력 항목은 시각이 없다.
+export const tipTime = (t: TipEntry) => (t.isManual ? "" : format(new Date(t.tippedAt), "HH:mm"));
+export const tipName = (t: TipEntry) => (t.isManual ? MANUAL_TIP_LABEL : t.depositor || "무기명");
+
+// 붙여넣은 내역은 시각순, 직접 입력 조정 항목은 맨 뒤
+export const sortTips = (tips: TipEntry[]) =>
+  [...tips].sort((a, b) =>
+    Number(a.isManual) - Number(b.isManual) || new Date(a.tippedAt).getTime() - new Date(b.tippedAt).getTime() || a.id - b.id
+  );
 
 export const tipSummary = (tips: TipEntry[]) =>
-  tips.map(t => `${tipTime(t)} ${t.depositor || "무기명"} ${t.amount.toLocaleString("ko-KR")}`).join(" · ");
+  sortTips(tips).map(t => `${tipTime(t)} ${tipName(t)} ${t.amount.toLocaleString("ko-KR")}`.trim()).join(" · ");

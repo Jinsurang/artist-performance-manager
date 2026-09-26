@@ -30,7 +30,8 @@ import {
   getMonthlySettlement,
   updateSettlement,
   setSettlementPaid,
-  replacePerformanceTips,
+  mergePerformanceTips,
+  deletePerformanceTip,
   getTipsForMonth,
   getTipsForPerformanceIds,
   findArtistsForPortal,
@@ -339,10 +340,20 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input, ctx }) => {
+        let added = 0;
+        let skipped = 0;
         for (const entry of input.entries) {
-          await replacePerformanceTips(entry.performanceId, entry.tips, ctx.db);
+          const result = await mergePerformanceTips(entry.performanceId, entry.tips, ctx.db);
+          added += result.added;
+          skipped += result.skipped;
         }
-        return { success: true, count: input.entries.length };
+        return { success: true, count: input.entries.length, added, skipped };
+      }),
+    deleteTip: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await deletePerformanceTip(input.id, ctx.db);
+        return { success: true };
       }),
   }),
 
