@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 import { TipPasteDialog } from "@/components/TipPasteDialog";
+import { holidayName, dayNumberColor } from "@/lib/holidays";
 import { DEFAULT_RATE_FALLBACK, won, computeSettlement, tipSummary, tipTime, tipName, sortTips, type SettlementAmounts, type TipEntry } from "@/lib/settlement";
 
 const DEFAULT_RATE_KEY = "settlement_default_rate";
@@ -417,13 +418,12 @@ export function SettlementTab() {
         ))}
         {Array(emptySlots).fill(null).map((_, i) => <div key={`empty-${i}`} className="bg-white/50 min-h-[72px] sm:min-h-[96px]" />)}
         {daysInMonth.map(date => {
-          const weekDay = getDay(date);
           const dayRows = rows.filter(r => isSameDay(r.date, date));
           const dayTotal = dayRows.reduce((s, r) => s + r.pre, 0);
           return (
             <div key={date.toISOString()} className="bg-white min-h-[72px] sm:min-h-[96px] p-1 sm:p-2 border-t border-l border-primary/5">
               <div className="flex items-center justify-between">
-                <span className={`text-xs font-black ${weekDay === 0 ? "text-red-500" : weekDay === 6 ? "text-blue-500" : ""}`}>{date.getDate()}</span>
+                <span title={holidayName(date)} className={`text-xs font-black ${dayNumberColor(date)}`}>{date.getDate()}</span>
                 {dayTotal > 0 && <span className="hidden sm:inline text-[9px] font-bold text-slate-400">{dayTotal.toLocaleString("ko-KR")}</span>}
               </div>
               <div className="mt-1 flex flex-col gap-1">

@@ -14,6 +14,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay 
 import { ko } from "date-fns/locale";
 import { ArtistCard } from "@/components/ArtistCard";
 import { SettlementTab } from "@/components/SettlementTab";
+import { holidayName, dayNumberColor } from "@/lib/holidays";
 import { Artist } from "@/types";
 
 const AVAILABLE_GENRES = ["어쿠스틱", "팝", "재즈", "포크", "인디", "락", "발라드", "브릿팝", "가요"];
@@ -531,9 +532,6 @@ export default function Home() {
           {Array(emptySlots).fill(null).map((_, i) => <div key={`empty-${i}`} className="bg-white/50 min-h-[80px] sm:min-h-[112px]" />)}
           {daysInMonth.map((date, i) => {
             const dayNum = date.getDate();
-            const weekDay = getDay(date);
-            const isSat = weekDay === 6;
-            const isSun = weekDay === 0;
             const isPast = date < today;
             const isToday = isSameDay(date, today);
 
@@ -566,7 +564,10 @@ export default function Home() {
                 }}
                 className={`${isPast && isAdminView ? 'bg-slate-200/70' : 'bg-white'} min-h-[80px] sm:min-h-[112px] p-1 sm:p-2 border-t border-l border-primary/5 relative cursor-pointer group transition-all ${isLocked ? 'opacity-40 grayscale pointer-events-none' : ''} ${isSelected ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-500 z-10' : 'hover:bg-primary/5'}`}
               >
-                <span className={`text-xs font-black ${isToday ? 'bg-primary text-white w-5 h-5 flex items-center justify-center rounded-full' : isPast && isAdminView ? 'text-slate-400' : isSun ? 'text-red-500' : isSat ? 'text-blue-500' : ''}`}>
+                <span
+                  title={holidayName(date)}
+                  className={`text-xs font-black ${isToday ? 'bg-primary text-white w-5 h-5 flex items-center justify-center rounded-full' : isPast && isAdminView ? 'text-slate-400' : dayNumberColor(date)}`}
+                >
                   {dayNum}
                 </span>
 
