@@ -159,7 +159,7 @@ export default function ArtistPortal() {
               </div>
               <h2 className="text-2xl font-black tracking-tight">정산내역 조회</h2>
               <p className="mt-2 text-sm text-slate-500 leading-relaxed">
-                아티스트 등록 시 알려주신<br />담당자 실명과 연락처 뒷 4자리를 입력해주세요.
+                아티스트 등록 시 알려주신<br />담당자 실명과 주민등록번호 뒷 4자리를 입력해주세요.
               </p>
             </div>
 
@@ -167,7 +167,7 @@ export default function ArtistPortal() {
               className="space-y-4"
               onSubmit={e => {
                 e.preventDefault();
-                if (canSubmit) login.mutate({ name: name.trim(), phoneLast4: last4 });
+                if (canSubmit) login.mutate({ name: name.trim(), residentLast4: last4 });
               }}
             >
               <div className="space-y-1.5">
@@ -182,11 +182,12 @@ export default function ArtistPortal() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-slate-600">연락처 뒷 4자리</Label>
+                <Label className="text-xs font-bold text-slate-600">주민등록번호 뒷 4자리</Label>
                 <Input
+                  type="password"
                   inputMode="numeric"
                   autoComplete="off"
-                  placeholder="0000"
+                  placeholder="••••"
                   maxLength={4}
                   value={last4}
                   onChange={e => setLast4(e.target.value.replace(/\D/g, "").slice(0, 4))}

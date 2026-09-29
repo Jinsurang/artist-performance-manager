@@ -362,7 +362,7 @@ export const appRouter = router({
       .input(
         z.object({
           name: z.string().trim().min(1).max(50),
-          phoneLast4: z.string().regex(/^\d{4}$/),
+          residentLast4: z.string().regex(/^\d{4}$/),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -372,10 +372,10 @@ export const appRouter = router({
           throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "확인 시도가 너무 많습니다. 15분 후 다시 시도해주세요." });
         }
 
-        const matched = await findArtistsForPortal(input.name, input.phoneLast4, ctx.db);
+        const matched = await findArtistsForPortal(input.name, input.residentLast4, ctx.db);
         if (matched.length === 0) {
           await recordPortalAttempt(nameKey, false, ctx.db);
-          throw new TRPCError({ code: "UNAUTHORIZED", message: "일치하는 정보가 없습니다. 담당자 실명과 연락처 뒷 4자리를 확인해주세요." });
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "일치하는 정보가 없습니다. 담당자 실명과 주민등록번호 뒷 4자리를 확인해주세요." });
         }
         await recordPortalAttempt(nameKey, true, ctx.db);
 

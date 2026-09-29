@@ -530,16 +530,19 @@ export async function getTipsForPerformanceIds(ids: number[], dbInstance?: any) 
 }
 
 /**
- * Artist portal - 아티스트 본인 정산 조회 (담당자 실명 + 연락처 뒷 4자리)
+ * Artist portal - 아티스트 본인 정산 조회 (담당자 실명 + 주민등록번호 뒷 4자리)
  */
-export async function findArtistsForPortal(realName: string, phoneLast4: string, dbInstance?: any) {
+export async function findArtistsForPortal(realName: string, residentLast4: string, dbInstance?: any) {
   const db = dbInstance || await getDb();
   if (!db) return [];
   const nameKey = realName.trim().toLowerCase();
+  const digits = sql`regexp_replace(coalesce(${artists.residentNumber}, ''), '\\D', '', 'g')`;
+  // 13자리 전체가 등록된 경우만 매칭 (앞자리만 있으면 생년월일 숫자와 오매칭될 수 있음)
   return await db.select({ id: artists.id, name: artists.name, realName: artists.realName })
     .from(artists)
     .where(sql`lower(trim(coalesce(${artists.realName}, ''))) = ${nameKey}
-      AND right(regexp_replace(coalesce(${artists.phone}, ''), '\\D', '', 'g'), 4) = ${phoneLast4}`)
+      AND length(${digits}) = 13
+      AND right(${digits}, 4) = ${residentLast4}`)
     .orderBy(artists.name);
 }
 
