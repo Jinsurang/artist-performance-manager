@@ -903,7 +903,7 @@ export default function Home() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-black text-slate-800">이미 공연하셨나요? 정산내역 조회</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">담당자 실명과 주민등록번호 뒷 4자리로 월별 공연비·팁 내역을 확인할 수 있습니다.</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">담당자 실명과 주민등록번호 끝 3자리로 월별 공연비·팁 내역을 확인할 수 있습니다.</p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-slate-300 shrink-0" />
               </div>
@@ -1639,7 +1639,7 @@ export default function Home() {
             <div className="space-y-3 p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100">
               <div>
                 <Label className="text-[11px] font-black text-indigo-700">정산 정보</Label>
-                <p className="text-[10px] font-medium text-indigo-400">정산 탭 지급 리스트에 표시됩니다. 관리자만 볼 수 있습니다. 실명 + 주민번호 뒷 4자리는 아티스트 정산내역 조회 로그인에 쓰입니다.</p>
+                <p className="text-[10px] font-medium text-indigo-400">정산 탭 지급 리스트에 표시됩니다. 관리자만 볼 수 있습니다. 실명 + 주민번호 끝 3자리는 아티스트 정산내역 조회 로그인에 쓰입니다.</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">

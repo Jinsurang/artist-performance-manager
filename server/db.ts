@@ -530,9 +530,9 @@ export async function getTipsForPerformanceIds(ids: number[], dbInstance?: any) 
 }
 
 /**
- * Artist portal - 아티스트 본인 정산 조회 (담당자 실명 + 주민등록번호 뒷 4자리)
+ * Artist portal - 아티스트 본인 정산 조회 (담당자 실명 + 주민등록번호 끝 3자리)
  */
-export async function findArtistsForPortal(realName: string, residentLast4: string, dbInstance?: any) {
+export async function findArtistsForPortal(realName: string, residentLast3: string, dbInstance?: any) {
   const db = dbInstance || await getDb();
   if (!db) return [];
   const nameKey = realName.trim().toLowerCase();
@@ -542,7 +542,7 @@ export async function findArtistsForPortal(realName: string, residentLast4: stri
     .from(artists)
     .where(sql`lower(trim(coalesce(${artists.realName}, ''))) = ${nameKey}
       AND length(${digits}) = 13
-      AND right(${digits}, 4) = ${residentLast4}`)
+      AND right(${digits}, 3) = ${residentLast3}`)
     .orderBy(artists.name);
 }
 

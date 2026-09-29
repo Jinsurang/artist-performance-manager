@@ -56,7 +56,7 @@ type PortalComputed = PortalRow & SettlementAmounts & { tips: TipEntry[] };
 export default function ArtistPortal() {
   const [session, setSession] = useState<PortalSession | null>(() => loadSession());
   const [name, setName] = useState("");
-  const [last4, setLast4] = useState("");
+  const [last3, setLast3] = useState("");
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth() + 1;
@@ -66,7 +66,7 @@ export default function ArtistPortal() {
       const s: PortalSession = { token: data.token, expiresAt: data.expiresAt, realName: data.realName, artists: data.artists };
       saveSession(s);
       setSession(s);
-      setLast4("");
+      setLast3("");
     },
   });
 
@@ -86,7 +86,7 @@ export default function ArtistPortal() {
     saveSession(null);
     setSession(null);
     setName("");
-    setLast4("");
+    setLast3("");
   };
 
   const defaultRate = parseInt(settlement.data?.defaultRateSetting || "", 10) || DEFAULT_RATE_FALLBACK;
@@ -123,7 +123,7 @@ export default function ArtistPortal() {
     paid: rows.filter(r => r.paidAt).length,
   }), [rows]);
 
-  const canSubmit = name.trim().length > 0 && /^\d{4}$/.test(last4) && !login.isPending;
+  const canSubmit = name.trim().length > 0 && /^\d{3}$/.test(last3) && !login.isPending;
 
   return (
     <div className="min-h-screen bg-[#fcfdfc] text-slate-900 font-sans flex flex-col">
@@ -159,7 +159,7 @@ export default function ArtistPortal() {
               </div>
               <h2 className="text-2xl font-black tracking-tight">정산내역 조회</h2>
               <p className="mt-2 text-sm text-slate-500 leading-relaxed">
-                아티스트 등록 시 알려주신<br />담당자 실명과 주민등록번호 뒷 4자리를 입력해주세요.
+                아티스트 등록 시 알려주신<br />담당자 실명과 주민등록번호 끝 3자리를 입력해주세요.
               </p>
             </div>
 
@@ -167,7 +167,7 @@ export default function ArtistPortal() {
               className="space-y-4"
               onSubmit={e => {
                 e.preventDefault();
-                if (canSubmit) login.mutate({ name: name.trim(), residentLast4: last4 });
+                if (canSubmit) login.mutate({ name: name.trim(), residentLast3: last3 });
               }}
             >
               <div className="space-y-1.5">
@@ -182,15 +182,15 @@ export default function ArtistPortal() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-slate-600">주민등록번호 뒷 4자리</Label>
+                <Label className="text-xs font-bold text-slate-600">주민등록번호 끝 3자리</Label>
                 <Input
                   type="password"
                   inputMode="numeric"
                   autoComplete="off"
-                  placeholder="••••"
-                  maxLength={4}
-                  value={last4}
-                  onChange={e => setLast4(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder="•••"
+                  maxLength={3}
+                  value={last3}
+                  onChange={e => setLast3(e.target.value.replace(/\D/g, "").slice(0, 3))}
                   className="h-12 rounded-xl bg-white border-slate-200 text-base tracking-[0.4em] text-center font-bold"
                 />
               </div>
