@@ -1,4 +1,4 @@
-import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { AXIOS_TIMEOUT_MS, COOKIE_NAME, SESSION_TTL_MS } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
 import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
@@ -183,7 +183,7 @@ class SDKServer {
     options: { expiresInMs?: number; env?: any } = {}
   ): Promise<string> {
     const issuedAt = Date.now();
-    const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
+    const expiresInMs = Math.min(options.expiresInMs ?? SESSION_TTL_MS, SESSION_TTL_MS);
     const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1000);
     const secretKey = this.getSessionSecret(options.env);
 
@@ -211,6 +211,12 @@ class SDKServer {
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
       });
+      // 예전에 1년짜리로 발급된 토큰은 남은 기간이 세션 한도보다 길다 → 무효 처리해 재로그인시킨다
+      const skewMs = 5 * 60 * 1000;
+      if (typeof payload.exp !== "number" || payload.exp * 1000 > Date.now() + SESSION_TTL_MS + skewMs) {
+        console.warn("[Auth] Session token lifetime exceeds limit; rejecting");
+        return null;
+      }
       const { openId, appId, name } = payload as Record<string, unknown>;
 
       if (

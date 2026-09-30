@@ -41,7 +41,7 @@ import {
 } from "./db";
 import { sdk } from "./_core/sdk";
 import { ENV, getEnv } from "./_core/env";
-import { ONE_YEAR_MS } from "@shared/const";
+import { SESSION_TTL_MS } from "@shared/const";
 import { SignJWT, jwtVerify } from "jose";
 
 const PORTAL_SCOPE = "artist-portal";
@@ -89,7 +89,7 @@ export const appRouter = router({
           const cookieOptions = getSessionCookieOptions(ctx.req);
           ctx.res.cookie(COOKIE_NAME, sessionToken, {
             ...cookieOptions,
-            maxAge: ONE_YEAR_MS,
+            maxAge: SESSION_TTL_MS,
           });
         }
 

@@ -3,6 +3,7 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "../../server/routers";
 import { getDb } from "../../server/db";
 import { sdk } from "../../server/_core/sdk";
+import { createFetchCookieResponse } from "../../server/_core/cookies";
 
 export const onRequest: any = async (context: any) => {
     const { request, env, next } = context;
@@ -14,7 +15,7 @@ export const onRequest: any = async (context: any) => {
             endpoint: "/api/trpc",
             req: request,
             router: appRouter,
-            createContext: async () => {
+            createContext: async ({ resHeaders }) => {
                 const db = await getDb(env.DATABASE_URL);
                 let user = null;
                 try {
@@ -22,7 +23,7 @@ export const onRequest: any = async (context: any) => {
                 } catch (e) {
                     // Auth is optional
                 }
-                return { env, db, user };
+                return { env, db, user, req: request, res: createFetchCookieResponse(resHeaders) };
             },
             onError: ({ path, error }) => {
                 console.error(`[tRPC Error] ${path}:`, error);

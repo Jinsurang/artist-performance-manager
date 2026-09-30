@@ -233,6 +233,7 @@ export default function Home() {
   const deleteNotice = trpc.notice.delete.useMutation();
   const { data: latestNotice, refetch: refetchNotices } = trpc.notice.getLatest.useQuery();
   const adminLogin = trpc.auth.adminLogin.useMutation();
+  const adminLogout = trpc.auth.logout.useMutation();
   const getSetting = trpc.settings.get.useQuery({ key: "message_template" }, {
     enabled: isAdmin,
     retry: false
@@ -251,6 +252,7 @@ export default function Home() {
         await adminLogin.mutateAsync({ passcode: password });
         setIsAdmin(true);
         localStorage.setItem('isAdmin', 'true');
+        queryClient.invalidateQueries({ queryKey: [['auth', 'me']] });
         setIsLoginOpen(false);
         setPassword("");
         toast.success("관리자로 로그인되었습니다.");
@@ -264,9 +266,19 @@ export default function Home() {
     }
   };
 
-  const handleAdminLogout = () => {
+  const handleAdminLogout = async () => {
+    try {
+      await adminLogout.mutateAsync();
+    } catch (error) {
+      // 서버 쿠키가 남아 있으면 새로고침 시 다시 로그인되므로, 화면만 로그아웃된 것처럼 보이게 두지 않는다
+      console.error("[Auth] Logout failed:", error);
+      toast.error("로그아웃에 실패했습니다. 다시 시도해주세요.");
+      return;
+    }
     setIsAdmin(false);
     localStorage.removeItem('isAdmin');
+    // 화면에 불러온 아티스트·정산 등 관리자 데이터를 메모리에서 비운다
+    queryClient.clear();
     toast.success("로그아웃되었습니다.");
   };
 
