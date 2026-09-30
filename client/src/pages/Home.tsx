@@ -247,22 +247,19 @@ export default function Home() {
   }, [getSetting.data]);
 
   const handleAdminLogin = async () => {
+    if (!password) return;
     try {
-      if (password === "6009") {
-        await adminLogin.mutateAsync({ passcode: password });
-        setIsAdmin(true);
-        localStorage.setItem('isAdmin', 'true');
-        queryClient.invalidateQueries({ queryKey: [['auth', 'me']] });
-        setIsLoginOpen(false);
-        setPassword("");
-        toast.success("관리자로 로그인되었습니다.");
-        refetchArtists();
-      } else {
-        toast.error("비밀번호가 올바르지 않습니다.");
-      }
+      await adminLogin.mutateAsync({ passcode: password });
+      setIsAdmin(true);
+      localStorage.setItem('isAdmin', 'true');
+      queryClient.invalidateQueries({ queryKey: [['auth', 'me']] });
+      setIsLoginOpen(false);
+      setPassword("");
+      toast.success("관리자로 로그인되었습니다.");
+      refetchArtists();
     } catch (error: any) {
       console.error("[Auth] Admin login failed:", error);
-      toast.error("관리자 인증에 실패했습니다.");
+      toast.error(error?.data?.code === "UNAUTHORIZED" ? "비밀번호가 올바르지 않습니다." : "관리자 인증에 실패했습니다.");
     }
   };
 
