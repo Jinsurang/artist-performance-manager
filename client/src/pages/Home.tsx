@@ -513,14 +513,14 @@ export default function Home() {
   };
 
   const renderCalendar = (isAdminView: boolean) => {
-    const headerDays = ["월", "화", "수", "목", "금", "토", "일"];
+    const headerDays = ["일", "월", "화", "수", "목", "금", "토"];
 
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
     const daysInMonth = eachDayOfInterval({ start, end });
 
-    let firstDay = getDay(start); // 0 (Sun) to 6 (Sat)
-    let emptySlots = firstDay === 0 ? 6 : firstDay - 1;
+    // 일요일 시작 달력: getDay(0=일~6=토)가 곧 앞쪽 빈 칸 수
+    const emptySlots = getDay(start);
 
     return (
       <div className="space-y-4">
@@ -538,7 +538,7 @@ export default function Home() {
 
             const perfs = (monthlyPerfs || [])
               .filter((p: any) => isSameDay(new Date(p.performanceDate), date))
-              .filter((p: any) => !showConfirmedOnly || p.status === 'confirmed')
+              .filter((p: any) => !isAdminView || !showConfirmedOnly || p.status === 'confirmed')
               .sort((a: any, b: any) => {
                 const aConfirmed = a.status !== 'pending' && a.status !== 'cancelled';
                 const bConfirmed = b.status !== 'pending' && b.status !== 'cancelled';
@@ -865,14 +865,6 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowConfirmedOnly(!showConfirmedOnly)}
-                    className={`h-8 rounded-xl text-[10px] font-black px-3 transition-all ${showConfirmedOnly ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-400 border-slate-200'}`}
-                  >
-                    {showConfirmedOnly ? "확정 공연만" : "전체 일정"}
-                  </Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}><ChevronLeft className="h-4 w-4" /></Button>
                   <span className="text-xs font-black min-w-[60px] text-center">{format(currentMonth, "M월")}</span>
                   <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}><ChevronRight className="h-4 w-4" /></Button>

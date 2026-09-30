@@ -14,7 +14,7 @@ import { HolidayLabel } from "@/components/HolidayLabel";
 import { DEFAULT_RATE_FALLBACK, won, computeSettlement, tipSummary, tipTime, tipName, sortTips, type SettlementAmounts, type TipEntry } from "@/lib/settlement";
 
 const DEFAULT_RATE_KEY = "settlement_default_rate";
-const HEADER_DAYS = ["월", "화", "수", "목", "금", "토", "일"];
+const HEADER_DAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 type SettlementRow = {
   id: number;
@@ -286,8 +286,8 @@ export function SettlementTab() {
   }), [groups, rows]);
 
   const daysInMonth = eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) });
-  const firstDay = getDay(startOfMonth(currentMonth));
-  const emptySlots = firstDay === 0 ? 6 : firstDay - 1;
+  // 일요일 시작 달력: getDay(0=일~6=토)가 곧 앞쪽 빈 칸 수
+  const emptySlots = getDay(startOfMonth(currentMonth));
 
   const scrollToRow = (id: number) => {
     const el = document.getElementById(`settle-row-${id}`);
