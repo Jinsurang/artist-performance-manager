@@ -1,11 +1,12 @@
 import { format, getDay } from "date-fns";
+import { holidayName } from "@/lib/holidays";
 
 export const DEFAULT_RATE_FALLBACK = 25000;
 export const WITHHOLDING_RATE = 0.033;
 
-// 금·토·일은 1부/2부 두 번 공연
+// 금·토·일과 공휴일은 1부/2부 두 번 공연
 const DOUBLE_SET_WEEKDAYS = [5, 6, 0];
-export const autoSetCount = (date: Date) => (DOUBLE_SET_WEEKDAYS.includes(getDay(date)) ? 2 : 1);
+export const autoSetCount = (date: Date) => (DOUBLE_SET_WEEKDAYS.includes(getDay(date)) || holidayName(date) ? 2 : 1);
 
 export const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
