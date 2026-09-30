@@ -14,7 +14,8 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay 
 import { ko } from "date-fns/locale";
 import { ArtistCard } from "@/components/ArtistCard";
 import { SettlementTab } from "@/components/SettlementTab";
-import { holidayName, dayNumberColor } from "@/lib/holidays";
+import { dayNumberColor } from "@/lib/holidays";
+import { HolidayLabel } from "@/components/HolidayLabel";
 import { Artist } from "@/types";
 
 const AVAILABLE_GENRES = ["어쿠스틱", "팝", "재즈", "포크", "인디", "락", "발라드", "브릿팝", "가요"];
@@ -564,12 +565,14 @@ export default function Home() {
                 }}
                 className={`${isPast && isAdminView ? 'bg-slate-200/70' : 'bg-white'} min-h-[80px] sm:min-h-[112px] p-1 sm:p-2 border-t border-l border-primary/5 relative cursor-pointer group transition-all ${isLocked ? 'opacity-40 grayscale pointer-events-none' : ''} ${isSelected ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-500 z-10' : 'hover:bg-primary/5'}`}
               >
-                <span
-                  title={holidayName(date)}
-                  className={`text-xs font-black ${isToday ? 'bg-primary text-white w-5 h-5 flex items-center justify-center rounded-full' : isPast && isAdminView ? 'text-slate-400' : dayNumberColor(date)}`}
-                >
-                  {dayNum}
-                </span>
+                <div className="flex flex-col sm:flex-row sm:items-start sm:gap-1 min-w-0">
+                  <span
+                    className={`shrink-0 text-xs font-black ${isToday ? 'bg-primary text-white w-5 h-5 flex items-center justify-center rounded-full' : isPast && isAdminView ? 'text-slate-400' : dayNumberColor(date)}`}
+                  >
+                    {dayNum}
+                  </span>
+                  <HolidayLabel date={date} colorClass={isPast && isAdminView ? 'text-slate-400' : dayNumberColor(date)} />
+                </div>
 
                 <div className={`mt-1 flex flex-col gap-1 relative z-10 ${isPast && isAdminView ? 'opacity-60 saturate-50' : ''}`}>
                   {isAdminView && perfs.map((p: any, idx: number) => {

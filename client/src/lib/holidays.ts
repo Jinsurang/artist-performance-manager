@@ -40,6 +40,12 @@ const HOLIDAYS: Record<string, string> = {
 
 export const holidayName = (date: Date): string | undefined => HOLIDAYS[format(date, "yyyy-MM-dd")];
 
+// 좁은 모바일 칸에서 "대체공휴일" / "(개천절)"로 나눠 줄바꿈하기 위해 괄호 앞에서 분리
+export const splitHolidayName = (name: string): [string, string | undefined] => {
+  const i = name.indexOf("(");
+  return i === -1 ? [name, undefined] : [name.slice(0, i), name.slice(i)];
+};
+
 // 일요일·평일 공휴일은 빨강, 토요일은 공휴일이어도 파랑 유지
 export const dayNumberColor = (date: Date): string => {
   const weekDay = getDay(date);
