@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from "date-fns";
 import { ko } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, ChevronDown, AlertTriangle, Users, CalendarDays, Wallet, Banknote, Download, CheckCircle2, Clock, ClipboardPaste, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, AlertTriangle, Users, CalendarDays, Wallet, Banknote, Download, CheckCircle2, Clock, ClipboardPaste, X, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -133,6 +133,33 @@ async function exportSettlementExcel(year: number, month: number, groups: Artist
   XLSX.utils.book_append_sheet(wb, detailSheet, "상세내역");
   // 한글 파일명은 일부 브라우저/OS에서 깨지거나 "download"로 저장되므로 영문 사용
   XLSX.writeFile(wb, `settlement_${year}-${String(month).padStart(2, "0")}.xlsx`);
+}
+
+// 은행 앱 이체 화면에 바로 붙여넣을 수 있게 은행명·하이픈을 빼고 숫자만 복사한다
+async function copyAccountNumber(bankAccount: string) {
+  const digits = bankAccount.replace(/\D/g, "");
+  if (!digits) {
+    toast.error("계좌번호에 숫자가 없습니다.");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(digits);
+  } catch {
+    // clipboard API를 쓸 수 없는 환경(비보안 접속 등)용 대체 방식
+    const textarea = document.createElement("textarea");
+    textarea.value = digits;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const ok = document.execCommand("copy");
+    textarea.remove();
+    if (!ok) {
+      toast.error("복사에 실패했습니다. 직접 선택해서 복사해주세요.");
+      return;
+    }
+  }
+  toast.success(`계좌번호 복사됨: ${digits}`);
 }
 
 function EditableNumber({
@@ -502,7 +529,18 @@ export function SettlementTab() {
                       <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11px]">
                         <dt className="font-bold text-slate-400">실명</dt><dd className="font-bold text-slate-700">{group.realName}</dd>
                         <dt className="font-bold text-slate-400">주민번호</dt><dd className="font-bold text-slate-700 tabular-nums">{group.residentNumber || "-"}</dd>
-                        <dt className="font-bold text-slate-400">계좌</dt><dd className="font-bold text-slate-700 tabular-nums break-all">{group.bankAccount}</dd>
+                        <dt className="font-bold text-slate-400">계좌</dt>
+                        <dd>
+                          <button
+                            type="button"
+                            title="클릭하면 계좌번호(숫자만)가 복사됩니다"
+                            onClick={() => copyAccountNumber(group.bankAccount!)}
+                            className="group/acct inline-flex items-center gap-1 text-left font-bold text-slate-700 tabular-nums break-all rounded hover:text-indigo-600 hover:underline underline-offset-2 transition-colors"
+                          >
+                            {group.bankAccount}
+                            <Copy className="h-3 w-3 shrink-0 text-slate-300 group-hover/acct:text-indigo-500" />
+                          </button>
+                        </dd>
                       </dl>
                     )}
                   </div>
