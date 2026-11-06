@@ -1,7 +1,7 @@
 // Deployment Version: 2026-02-10T05:10
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "../../server/routers";
-import { getDb } from "../../server/db";
+import { openRequestDb } from "../../server/db";
 import { sdk } from "../../server/_core/sdk";
 import { createFetchCookieResponse } from "../../server/_core/cookies";
 
@@ -11,12 +11,15 @@ export const onRequest: any = async (context: any) => {
 
     // tRPC handler
     if (url.pathname.startsWith("/api/trpc")) {
-        return fetchRequestHandler({
+        // Workers는 한 요청에서 연 소켓을 다른 요청에서 쓰면 실패하므로, 요청마다 DB 연결을 열고 응답 후 닫는다
+        let closeDb: (() => Promise<void>) | null = null;
+        const response = await fetchRequestHandler({
             endpoint: "/api/trpc",
             req: request,
             router: appRouter,
             createContext: async ({ resHeaders }) => {
-                const db = await getDb(env.DATABASE_URL);
+                const { db, close } = await openRequestDb(env.DATABASE_URL);
+                closeDb = close;
                 let user = null;
                 try {
                     user = await sdk.authenticateRequest(request.headers.get('cookie') || undefined, db, env);
@@ -45,6 +48,8 @@ export const onRequest: any = async (context: any) => {
                 headers: { "Content-Type": "application/json" }
             });
         });
+        if (closeDb) context.waitUntil((closeDb as () => Promise<void>)().catch(() => {}));
+        return response;
     }
 
     return next();

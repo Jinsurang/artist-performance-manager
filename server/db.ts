@@ -7,46 +7,56 @@ import { ENV } from './_core/env';
 // Safe access to process.env (may not exist in Cloudflare Workers)
 const safeProcessEnv = typeof process !== 'undefined' ? process.env : {};
 
-// Global singleton for the database connection
+// Node(Express) 서버용 전역 연결. Cloudflare Workers에서는 요청 간 소켓 공유가 금지되므로 openRequestDb()를 쓴다.
 let _db: ReturnType<typeof drizzle> | null = null;
 let _sql: ReturnType<typeof postgres> | null = null;
-let _schemaReady: Promise<void> | null = null;
+let _schemaEnsured = false;
 
 // 이 프로젝트는 drizzle 마이그레이션 파이프라인 없이 배포되므로, 추가된 컬럼은 첫 연결 시 멱등하게 보장한다.
-function ensureSchema(sqlClient: ReturnType<typeof postgres>) {
-  if (!_schemaReady) {
-    _schemaReady = (async () => {
-      await sqlClient`ALTER TABLE artists ADD COLUMN IF NOT EXISTS real_name VARCHAR(100)`;
-      await sqlClient`ALTER TABLE artists ADD COLUMN IF NOT EXISTS resident_number VARCHAR(20)`;
-      await sqlClient`ALTER TABLE artists ADD COLUMN IF NOT EXISTS bank_account VARCHAR(255)`;
-      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS actual_member_count INTEGER`;
-      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS per_person_rate INTEGER`;
-      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS extra_tip INTEGER DEFAULT 0 NOT NULL`;
-      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP`;
-      await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS set_count INTEGER`;
-      await sqlClient`CREATE TABLE IF NOT EXISTS performance_tips (
-        id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-        performance_id INTEGER NOT NULL REFERENCES performances(id) ON DELETE CASCADE,
-        tipped_at TIMESTAMP NOT NULL,
-        amount INTEGER NOT NULL,
-        depositor VARCHAR(100),
-        created_at TIMESTAMP NOT NULL DEFAULT NOW()
-      )`;
-      await sqlClient`CREATE INDEX IF NOT EXISTS performance_tips_performance_id_idx ON performance_tips(performance_id)`;
-      await sqlClient`ALTER TABLE performance_tips ADD COLUMN IF NOT EXISTS is_manual BOOLEAN NOT NULL DEFAULT FALSE`;
-      await sqlClient`CREATE TABLE IF NOT EXISTS portal_login_attempts (
-        id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-        name_key VARCHAR(100) NOT NULL,
-        success BOOLEAN NOT NULL DEFAULT FALSE,
-        attempted_at TIMESTAMP NOT NULL DEFAULT NOW()
-      )`;
-      await sqlClient`CREATE INDEX IF NOT EXISTS portal_login_attempts_name_key_idx ON portal_login_attempts(name_key, attempted_at)`;
-    })().catch(error => {
-      console.error("[Database] Schema ensure failed:", error);
-      _schemaReady = null;
-    });
+// 다른 요청이 만든 Promise를 기다리면 Workers에서 문제가 되므로, 완료 여부만 플래그로 공유한다.
+async function ensureSchema(sqlClient: ReturnType<typeof postgres>) {
+  if (_schemaEnsured) return;
+  try {
+    await sqlClient`ALTER TABLE artists ADD COLUMN IF NOT EXISTS real_name VARCHAR(100)`;
+    await sqlClient`ALTER TABLE artists ADD COLUMN IF NOT EXISTS resident_number VARCHAR(20)`;
+    await sqlClient`ALTER TABLE artists ADD COLUMN IF NOT EXISTS bank_account VARCHAR(255)`;
+    await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS actual_member_count INTEGER`;
+    await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS per_person_rate INTEGER`;
+    await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS extra_tip INTEGER DEFAULT 0 NOT NULL`;
+    await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP`;
+    await sqlClient`ALTER TABLE performances ADD COLUMN IF NOT EXISTS set_count INTEGER`;
+    await sqlClient`CREATE TABLE IF NOT EXISTS performance_tips (
+      id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+      performance_id INTEGER NOT NULL REFERENCES performances(id) ON DELETE CASCADE,
+      tipped_at TIMESTAMP NOT NULL,
+      amount INTEGER NOT NULL,
+      depositor VARCHAR(100),
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )`;
+    await sqlClient`CREATE INDEX IF NOT EXISTS performance_tips_performance_id_idx ON performance_tips(performance_id)`;
+    await sqlClient`ALTER TABLE performance_tips ADD COLUMN IF NOT EXISTS is_manual BOOLEAN NOT NULL DEFAULT FALSE`;
+    await sqlClient`CREATE TABLE IF NOT EXISTS portal_login_attempts (
+      id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+      name_key VARCHAR(100) NOT NULL,
+      success BOOLEAN NOT NULL DEFAULT FALSE,
+      attempted_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )`;
+    await sqlClient`CREATE INDEX IF NOT EXISTS portal_login_attempts_name_key_idx ON portal_login_attempts(name_key, attempted_at)`;
+    _schemaEnsured = true;
+  } catch (error) {
+    console.error("[Database] Schema ensure failed:", error);
   }
-  return _schemaReady;
+}
+
+function createClient(url: string, max: number) {
+  return postgres(url, {
+    ssl: 'require',
+    // Supabase 트랜잭션 풀러(6543)는 prepared statement를 지원하지 않는다
+    prepare: false,
+    connect_timeout: 10,
+    max,
+    idle_timeout: 30,
+  });
 }
 
 export async function getDb(databaseUrl?: string) {
@@ -55,14 +65,7 @@ export async function getDb(databaseUrl?: string) {
 
   if (!_sql) {
     try {
-      _sql = postgres(url, {
-        ssl: 'require',
-        max_prepared: 0,
-        connect_timeout: 10,
-        // Render (Node.js) can handle multiple connections better than Cloudflare
-        max: 10,
-        idle_timeout: 30,
-      } as any);
+      _sql = createClient(url, 10);
       _db = drizzle(_sql);
     } catch (error) {
       console.error("[Database] Connection failed:", error);
@@ -72,6 +75,14 @@ export async function getDb(databaseUrl?: string) {
   }
   if (_sql) await ensureSchema(_sql);
   return _db;
+}
+
+// Cloudflare Workers용: 요청마다 연결을 새로 열고, 응답 후 close()로 닫는다.
+export async function openRequestDb(url: string) {
+  const sqlClient = createClient(url, 1);
+  const db = drizzle(sqlClient);
+  await ensureSchema(sqlClient);
+  return { db, close: () => sqlClient.end({ timeout: 5 }) };
 }
 
 export async function getRawSql() {
@@ -153,7 +164,7 @@ export async function getUserByOpenId(openId: string, dbInstance?: any) {
  * Artist queries
  */
 export async function createArtist(data: any, dbInstance?: any) {
-  const sqlClient = await getRawSql();
+  const sqlClient = dbInstance?.$client ?? await getRawSql();
   if (!sqlClient) throw new Error("데이터베이스 연결 실패");
 
   // V3.0: Standard SQL insert for Node.js (Render)
